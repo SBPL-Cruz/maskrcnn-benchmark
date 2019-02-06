@@ -33,26 +33,29 @@ DATASETS:
   TRAIN: (
           "fat_2018_kitedemo_0_cocostyle",
           "fat_2018_kitedemo_1_cocostyle",
+          "fat_2018_kitchen_0_cocostyle", 
+          "fat_2018_kitchen_1_cocostyle",
+          "fat_2018_kitedemo_2_cocostyle",
+          "fat_2018_kitedemo_3_cocostyle",
+          "fat_2018_kitedemo_4_cocostyle",
+          "fat_2018_temple_0_cocostyle",
+          "fat_2018_temple_1_cocostyle",
+          "fat_2018_temple_2_cocostyle",
+          "fat_2018_temple_3_cocostyle",
+          "fat_2018_temple_4_cocostyle",
           )
-#          "fat_2018_kitchen_0_cocostyle", 
-#          "fat_2018_kitchen_1_cocostyle",
-          
-#          "fat_2018_kitedemo_2_cocostyle",
-#          "fat_2018_kitedemo_3_cocostyle",
-#          "fat_2018_kitedemo_4_cocostyle",
-#          "fat_2018_temple_0_cocostyle",
-#          "fat_2018_temple_1_cocostyle",
-#          "fat_2018_temple_2_cocostyle",
-#          "fat_2018_temple_3_cocostyle",
-#          "fat_2018_temple_4_cocostyle",
-#          )
   TEST: ("fat_2018_kitchen_2_cocostyle",
           "fat_2018_kitchen_3_cocostyle",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
 SOLVER:
-  BASE_LR: 0.001
-  WEIGHT_DECAY: 0.00001
-  STEPS: (2000,)
-  MAX_ITER: 32000
-  IMS_PER_BATCH: 1
+  BASE_LR: 0.01
+  WEIGHT_DECAY: 0.0001
+  STEPS: (18000,)
+  MAX_ITER: 24000
+#SOLVER:
+#  BASE_LR: 0.001
+#  WEIGHT_DECAY: 0.00001
+#  STEPS: (2000,)
+#  MAX_ITER: 32000
+#  IMS_PER_BATCH: 1

@@ -89,72 +89,72 @@ class DatasetCatalog(object):
             "ann_file": "cityscapes/annotations/instancesonly_filtered_gtFine_test.json"
         },
         "fat_2018_train": {
-            "data_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/train",
+            "data_dir": "fat/mixed/train",
             "split": "train"
         },
         "fat_2018_test": {
-            "data_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/test",
+            "data_dir": "fat/mixed/test",
             "split": "test"
         },
         "fat_2018_train_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/train/kitchen_0",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/train/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/train/kitchen_0",
+            "ann_file": "fat/mixed/train/instances_fat_train2018.json"
         },
         "fat_2018_test_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/val/kitchen_3",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/val/instances_fat_val2018.json"
+            "img_dir": "fat/mixed/val/kitchen_3",
+            "ann_file": "fat/mixed/val/instances_fat_val2018.json"
         },
         "fat_2018_kitchen_0_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitchen_0",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitchen_0/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/kitchen_0",
+            "ann_file": "fat/mixed/extra/kitchen_0/instances_fat_train2018.json"
         },
         "fat_2018_kitchen_1_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitchen_1",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitchen_1/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/kitchen_1",
+            "ann_file": "fat/mixed/extra/kitchen_1/instances_fat_train2018.json"
         },
         "fat_2018_kitchen_4_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitchen_4",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitchen_4/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/kitchen_4",
+            "ann_file": "fat/mixed/extra/kitchen_4/instances_fat_train2018.json"
         },
         "fat_2018_kitedemo_0_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_0",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_0/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/kitedemo_0",
+            "ann_file": "fat/mixed/extra/kitedemo_0/instances_fat_train2018.json"
         },
         "fat_2018_kitedemo_1_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_1",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_1/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/kitedemo_1",
+            "ann_file": "fat/mixed/extra/kitedemo_1/instances_fat_train2018.json"
         },
         "fat_2018_kitedemo_2_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_2",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_2/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/kitedemo_2",
+            "ann_file": "fat/mixed/extra/kitedemo_2/instances_fat_train2018.json"
         },
         "fat_2018_kitedemo_3_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_3",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_3/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/kitedemo_3",
+            "ann_file": "fat/mixed/extra/kitedemo_3/instances_fat_train2018.json"
         },
         "fat_2018_kitedemo_4_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_4",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/kitedemo_4/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/kitedemo_4",
+            "ann_file": "fat/mixed/extra/kitedemo_4/instances_fat_train2018.json"
         },
         "fat_2018_temple_0_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_0",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_0/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/temple_0",
+            "ann_file": "fat/mixed/extra/temple_0/instances_fat_train2018.json"
         },
         "fat_2018_temple_1_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_1",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_1/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/temple_1",
+            "ann_file": "fat/mixed/extra/temple_1/instances_fat_train2018.json"
         },
         "fat_2018_temple_2_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_2",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_2/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/temple_2",
+            "ann_file": "fat/mixed/extra/temple_2/instances_fat_train2018.json"
         },
         "fat_2018_temple_3_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_3",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_3/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/temple_3",
+            "ann_file": "fat/mixed/extra/temple_3/instances_fat_train2018.json"
         },
         "fat_2018_temple_4_cocostyle": {
-            "img_dir": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_4",
-            "ann_file": "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/datasets/fat/mixed/extra/temple_4/instances_fat_train2018.json"
+            "img_dir": "fat/mixed/extra/temple_4",
+            "ann_file": "fat/mixed/extra/temple_4/instances_fat_train2018.json"
         },
     }
 
