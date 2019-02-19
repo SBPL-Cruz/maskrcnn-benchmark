@@ -1,0 +1,21 @@
+#!/bin/bash
+#SBATCH -N 1
+#SBATCH -p GPU
+#SBATCH --ntasks-per-node 1
+#SBATCH -t 20:00:00
+#SBATCH --gres=gpu:k80:4
+
+#echo commands to stdout
+set -x
+
+#move to working directory
+# this job assumes:
+# - all input data is stored in this directory 
+# - all output should be stored in this directory 
+
+#run GPU program
+conda activate /pylon5/ir5fq3p/likhache/aditya/fb_mask_rcnn/maskrcnn_benchmark
+cd /pylon5/ir5fq3p/likhache/aditya/fb_mask_rcnn/maskrcnn-benchmark
+which python
+export PYTHONPATH=$PYTHONPATH:/pylon5/ir5fq3p/likhache/aditya/fb_mask_rcnn/maskrcnn-benchmark
+python tools/train_net.py --config configs/fat/e2e_mask_rcnn_R_50_FPN_1x_cocostyle.yaml |& tee log
