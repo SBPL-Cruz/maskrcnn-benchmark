@@ -20,7 +20,7 @@ from pathlib import Path
 class FATDataset(torch.utils.data.Dataset):
 
     CLASSES = [
-#        "__background__ ",
+        "__background__ ",
 		"002_master_chef_can_16k",
 		"003_cracker_box_16k",
 		"004_sugar_box_16k",

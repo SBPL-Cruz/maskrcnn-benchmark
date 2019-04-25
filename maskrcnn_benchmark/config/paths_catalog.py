@@ -112,6 +112,14 @@ class DatasetCatalog(object):
             "img_dir": "fat/mixed/extra/kitchen_1",
             "ann_file": "fat/mixed/extra/kitchen_1/instances_fat_train2018.json"
         },
+        "fat_2018_kitchen_2_cocostyle": {
+            "img_dir": "fat/mixed/extra/kitchen_2",
+            "ann_file": "fat/mixed/extra/kitchen_2/instances_fat_train2018.json"
+        },
+        "fat_2018_kitchen_3_cocostyle": {
+            "img_dir": "fat/mixed/extra/kitchen_3",
+            "ann_file": "fat/mixed/extra/kitchen_3/instances_fat_train2018.json"
+        },
         "fat_2018_kitchen_4_cocostyle": {
             "img_dir": "fat/mixed/extra/kitchen_4",
             "ann_file": "fat/mixed/extra/kitchen_4/instances_fat_train2018.json"
@@ -155,6 +163,14 @@ class DatasetCatalog(object):
         "fat_2018_temple_4_cocostyle": {
             "img_dir": "fat/mixed/extra/temple_4",
             "ann_file": "fat/mixed/extra/temple_4/instances_fat_train2018.json"
+        },
+        "shapestack_train_cocostyle": {
+            "img_dir": "shapestacks/jenga_recordings",
+            "ann_file": "shapestacks/instances_shapestacks_train2018.json"
+        },
+        "shapestack_val_cocostyle": {
+            "img_dir": "shapestacks/jenga_recordings",
+            "ann_file": "shapestacks/instances_shapestacks_train2018.json"
         },
     }
 
@@ -200,7 +216,7 @@ class DatasetCatalog(object):
 class ModelCatalog(object):
     S3_C2_DETECTRON_URL = "https://dl.fbaipublicfiles.com/detectron"
     C2_IMAGENET_MODELS = {
-        "MSRA/R-50": "/home/likhache/.torch/models/R-50.pkl",
+        "MSRA/R-50": "ImageNetPretrained/MSRA/R-50.pkl",
         "MSRA/R-50-GN": "ImageNetPretrained/47261647/R-50-GN.pkl",
         "MSRA/R-101": "ImageNetPretrained/MSRA/R-101.pkl",
         "MSRA/R-101-GN": "ImageNetPretrained/47592356/R-101-GN.pkl",
@@ -233,7 +249,7 @@ class ModelCatalog(object):
         name = name[len("ImageNetPretrained/"):]
         name = ModelCatalog.C2_IMAGENET_MODELS[name]
         url = "/".join([prefix, name])
-        return name
+        return url
 
     @staticmethod
     def get_c2_detectron_12_2017_baselines(name):

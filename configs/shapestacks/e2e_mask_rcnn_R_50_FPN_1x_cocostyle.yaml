@@ -19,7 +19,7 @@ MODEL:
     POOLER_SAMPLING_RATIO: 2
     FEATURE_EXTRACTOR: "FPN2MLPFeatureExtractor"
     PREDICTOR: "FPNPredictor"
-    NUM_CLASSES: 22
+    NUM_CLASSES: 2
   ROI_MASK_HEAD:
     POOLER_SCALES: (0.25, 0.125, 0.0625, 0.03125)
     FEATURE_EXTRACTOR: "MaskRCNNFPNFeatureExtractor"
@@ -30,30 +30,8 @@ MODEL:
     SHARE_BOX_FEATURE_EXTRACTOR: False
   MASK_ON: True
 DATASETS:
-  TRAIN: (
-          "fat_2018_kitedemo_0_cocostyle",
-          "fat_2018_kitedemo_1_cocostyle",
-          "fat_2018_kitchen_0_cocostyle", 
-          "fat_2018_kitchen_1_cocostyle",
-          "fat_2018_temple_0_cocostyle",
-          "fat_2018_temple_1_cocostyle",
-          )
-#  TRAIN: (
-#          "fat_2018_kitedemo_0_cocostyle",
-#          "fat_2018_kitedemo_1_cocostyle",
-#          "fat_2018_kitchen_0_cocostyle", 
-#          "fat_2018_kitchen_1_cocostyle",
-#          "fat_2018_kitedemo_2_cocostyle",
-#          "fat_2018_kitedemo_3_cocostyle",
-#          "fat_2018_kitedemo_4_cocostyle",
-#          "fat_2018_temple_0_cocostyle",
-#          "fat_2018_temple_1_cocostyle",
-#          "fat_2018_temple_2_cocostyle",
-#          "fat_2018_temple_3_cocostyle",
-#          "fat_2018_temple_4_cocostyle",
-#          )
-  TEST: ("fat_2018_kitchen_2_cocostyle",
-          "fat_2018_kitchen_3_cocostyle",)
+  TRAIN: ("shapestack_train_cocostyle",)
+  TEST: ("shapestack_val_cocostyle",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
 SOLVER:
@@ -64,9 +42,3 @@ SOLVER:
   IMS_PER_BATCH: 4
 TEST:
   IMS_PER_BATCH: 4
-#SOLVER:
-#  BASE_LR: 0.001
-#  WEIGHT_DECAY: 0.00001
-#  STEPS: (2000,)
-#  MAX_ITER: 32000
-#  IMS_PER_BATCH: 1
