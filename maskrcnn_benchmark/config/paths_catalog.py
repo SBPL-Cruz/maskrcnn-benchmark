@@ -186,7 +186,7 @@ class DatasetCatalog(object):
         },
         "shapestack_val_cocostyle": {
             "img_dir": "shapestacks/jenga_recordings",
-            "ann_file": "shapestacks/instances_shapestacks_train2018.json"
+            "ann_file": "shapestacks/instances_shapestacks_eval2018.json"
         },
     }
 

@@ -22,9 +22,9 @@ from pycocotools.coco import COCO
 import pylab
 import json
 
-ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/shapestacks'
-IMG_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/shapestacks/jenga_recordings'
-ROOT_OUTDIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/shapestacks'
+ROOT_DIR = '/data/sarthak_data/dataset'
+IMG_DIR = '/data/sarthak_data/dataset/jenga_recordings'
+ROOT_OUTDIR = '/data/sarthak_data/dataset'
 OUTFILE_NAME = 'instances_shapestacks_train2018'
 
 INFO = {
@@ -60,26 +60,27 @@ def get_seg_file_name(block_num, img_file, scenario_dir):
 def filter_for_jpeg(root, IMG_DIR):
     
 
-    scenario_list_file = os.path.join(root, 'predictions.json')
+    scenario_list_file = os.path.join(root, 'train.json')
     with open(scenario_list_file) as f:
-        scenario_list_dict = json.load(f)
+        scenario_list = json.load(f)
     
     # files = []
     img_seg_files_dict = {}
-    for scenario in list(scenario_list_dict.keys()):
+    for scenario in scenario_list:
         if scenario.endswith('_r') == False:
             scenario_path = os.path.join(IMG_DIR, scenario)
             for img_file in filter(
                 lambda f: f.startswith('rgb-') and f.endswith('-mono-0.png'),
                 os.listdir(scenario_path)):
-                img_file_path = os.path.join(scenario_path, img_file)
-                img_key = "{}/{}".format(scenario, img_file)
-                # files.append(img_file_path)
-                seg_files = []
-                for b in range(get_num_blocks(scenario)):
-                    seg_files.append(get_seg_file_name(b, img_file, scenario_path))
-                img_seg_files_dict[img_key] = seg_files
-                # print(seg_files)
+                if 'cam_1-' not in img_file:
+                    img_file_path = os.path.join(scenario_path, img_file)
+                    img_key = "{}/{}".format(scenario, img_file)
+                    # files.append(img_file_path)
+                    seg_files = []
+                    for b in range(get_num_blocks(scenario)):
+                        seg_files.append(get_seg_file_name(b, img_file, scenario_path))
+                    img_seg_files_dict[img_key] = seg_files
+                    # print(seg_files)
 
     return img_seg_files_dict
 
