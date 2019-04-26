@@ -153,7 +153,7 @@ def main():
             segmentation_global_id += 1
 
         if mask_valid == True:
-            pass
+            # pss
             coco_output["images"].append(image_info)
         else:
             print("No valid mask")

@@ -7,6 +7,7 @@ import torch
 import torch.distributed as dist
 
 from maskrcnn_benchmark.utils.comm import get_world_size
+from maskrcnn_benchmark.utils.comm import synchronize
 from maskrcnn_benchmark.utils.miscellaneous import mkdir
 from maskrcnn_benchmark.engine.inference import inference
 from maskrcnn_benchmark.data import make_data_loader
@@ -44,6 +45,7 @@ def val(cfg, model, distributed=False):
             expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
             output_folder=output_folder,
         )
+        synchronize()
         bbox_result = result[0].results['bbox']
         segm_result = result[0].results['segm']
         # output_tuple[dataset_name] = {}
@@ -134,7 +136,7 @@ def do_train(
         eta_seconds = meters.time.global_avg * (max_iter - iteration)
         eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
 
-        if iteration % 20 == 0 or iteration == max_iter:
+        if iteration % 100 == 0 or iteration == max_iter:
             logger.info(
                 meters.delimiter.join(
                     [
@@ -157,7 +159,7 @@ def do_train(
         
         if iteration % eval_period == 0 and iteration > 0:
             print("ENTER VALIDATION CALCULATIONS every : {}".format(eval_period))
-            output = val(cfg, model, distributed)
+            output = val(cfg, model, distributed=distributed)
             meters.update(**output)
             model.train()
             
