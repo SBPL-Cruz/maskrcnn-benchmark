@@ -427,6 +427,8 @@ _C.TEST.IMS_PER_BATCH = 8
 # Number of detections per image
 _C.TEST.DETECTIONS_PER_IMG = 100
 
+_C.TEST.EVAL_ITER = 100
+
 
 # ---------------------------------------------------------------------------- #
 # Misc options

@@ -76,6 +76,7 @@ def train(cfg, local_rank, distributed, use_tensorboard=False):
     )
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
+    eval_period = cfg.TEST.EVAL_ITER
     if use_tensorboard:
         meters = TensorboardLogger(
             log_dir=cfg.TENSORBOARD_EXPERIMENT,
@@ -85,6 +86,7 @@ def train(cfg, local_rank, distributed, use_tensorboard=False):
         meters = MetricLogger(delimiter="  ")
 
     do_train(
+        cfg,
         model,
         data_loader,
         optimizer,
@@ -93,7 +95,9 @@ def train(cfg, local_rank, distributed, use_tensorboard=False):
         device,
         checkpoint_period,
         arguments,
-        meters
+        meters,
+        distributed,
+        eval_period
     )
 
     return model

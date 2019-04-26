@@ -27,11 +27,6 @@ IMG_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/shapestacks/jenga_recordings'
 ROOT_OUTDIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/shapestacks'
 OUTFILE_NAME = 'instances_shapestacks_train2018'
 
-#ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/val'
-#IMAGE_DIR = os.path.join(ROOT_DIR, "kitchen_3")
-#ANNOTATION_DIR = os.path.join(ROOT_DIR, "kitchen_3")
-#OUTFILE_NAME = 'instances_fat_val2018'
-
 INFO = {
     "description": "Example Dataset",
     "url": "https://github.com/waspinator/pycococreator",
