@@ -46,13 +46,15 @@ def val(cfg, model, distributed=False):
             output_folder=output_folder,
         )
         synchronize()
-        bbox_result = result[0].results['bbox']
-        segm_result = result[0].results['segm']
-        # output_tuple[dataset_name] = {}
-        output_tuple[dataset_name+'_bbox_AP'] = bbox_result['AP'].item()
-        output_tuple[dataset_name+'_bbox_AP50'] = bbox_result['AP50'].item()
-        output_tuple[dataset_name+'_segm_AP'] = segm_result['AP'].item()
-        output_tuple[dataset_name+'_segm_AP50'] = segm_result['AP50'].item()
+        if result is not None:
+            if len(result) > 0:
+                bbox_result = result[0].results['bbox']
+                segm_result = result[0].results['segm']
+                # output_tuple[dataset_name] = {}
+                output_tuple[dataset_name+'_bbox_AP'] = bbox_result['AP'].item()
+                output_tuple[dataset_name+'_bbox_AP50'] = bbox_result['AP50'].item()
+                output_tuple[dataset_name+'_segm_AP'] = segm_result['AP'].item()
+                output_tuple[dataset_name+'_segm_AP50'] = segm_result['AP50'].item()
 
     return output_tuple
 
@@ -157,11 +159,11 @@ def do_train(
         if iteration % checkpoint_period == 0:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
         
-        if iteration % eval_period == 0 and iteration > 0:
-            print("ENTER VALIDATION CALCULATIONS every : {}".format(eval_period))
-            output = val(cfg, model, distributed=distributed)
-            meters.update(**output)
-            model.train()
+        #if iteration % eval_period == 0 and iteration > 0:
+        #    print("ENTER VALIDATION CALCULATIONS every : {}".format(eval_period))
+        #    output = val(cfg, model, distributed=distributed)
+        #    meters.update(**output)
+        #    model.train()
             
         if iteration == max_iter:
             checkpointer.save("model_final", **arguments)

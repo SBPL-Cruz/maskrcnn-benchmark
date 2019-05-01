@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pylab
 
 image_directory = './datasets/shapestacks/jenga_recordings/'
-annotation_file = './datasets/shapestacks/instances_shapestacks_train2018.json'
+annotation_file = './datasets/shapestacks/instances_shapestacks_train_cam_limit_2018.json'
 
 example_coco = COCO(annotation_file)
 
@@ -36,4 +36,5 @@ annotation_ids = example_coco.getAnnIds(imgIds=image_data['id'], catIds=category
 annotations = example_coco.loadAnns(annotation_ids)
 print('Image annotations : {}'.format(annotations))
 example_coco.showAnns(annotations)
+plt.savefig('tools/visualize_shapestacks.png')
 plt.show()

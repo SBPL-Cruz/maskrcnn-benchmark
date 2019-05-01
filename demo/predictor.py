@@ -10,32 +10,11 @@ from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark import layers as L
 from maskrcnn_benchmark.utils import cv2_util
 
-
 class COCODemo(object):
     # COCO categories for pretty print
     CATEGORIES = [
         "__background",
-		"002_master_chef_can_16k",
-		"003_cracker_box_16k",
-		"004_sugar_box_16k",
-		"005_tomato_soup_can_16k",
-		"006_mustard_bottle_16K",
-		"007_tuna_fish_can_16k",
-		"008_pudding_box_16k",
-		"009_gelatin_box_16k",
-		"010_potted_meat_can_16k",
-		"011_banana_16k",
-		"019_pitcher_base_16k",
-		"021_bleach_cleanser_16k",
-		"024_bowl_16k",
-		"025_mug_16k",
-		"035_power_drill_16k",
-		"036_wood_block_16k",
-		"037_scissors_16k",
-		"040_large_marker_16k",
-		"051_large_clamp_16k",
-		"052_extra_large_clamp_16k",
-		"061_foam_brick_16k"
+		"jenga_block"
     ]
 
     def __init__(
@@ -44,7 +23,7 @@ class COCODemo(object):
         confidence_threshold=0.7,
         show_mask_heatmaps=False,
         masks_per_dim=2,
-        min_image_size=224,
+        min_image_size=800,
     ):
         self.cfg = cfg.clone()
         self.model = build_detection_model(cfg)
@@ -55,6 +34,7 @@ class COCODemo(object):
 
         save_dir = cfg.OUTPUT_DIR
         checkpointer = DetectronCheckpointer(cfg, self.model, save_dir=save_dir)
+        print(cfg.MODEL.WEIGHT)
         _ = checkpointer.load(cfg.MODEL.WEIGHT)
 
         self.transforms = self.build_transform()
@@ -118,12 +98,16 @@ class COCODemo(object):
             return self.create_mask_montage(result, top_predictions)
         result = self.overlay_boxes(result, top_predictions)
         if self.cfg.MODEL.MASK_ON:
+            mask_list = self.get_all_masks(result, top_predictions)
             result = self.overlay_mask(result, top_predictions)
         if self.cfg.MODEL.KEYPOINT_ON:
             result = self.overlay_keypoints(result, top_predictions)
         result = self.overlay_class_names(result, top_predictions)
 
-        return result
+        if self.cfg.MODEL.MASK_ON:
+            return result, mask_list
+        else:
+            return result
 
     def compute_prediction(self, original_image):
         """
@@ -145,7 +129,7 @@ class COCODemo(object):
         with torch.no_grad():
             predictions = self.model(image_list)
         predictions = [o.to(self.cpu_device) for o in predictions]
-
+        print("Found : {}".format(predictions))
         # always single image is passed at a time
         prediction = predictions[0]
 
@@ -239,6 +223,31 @@ class COCODemo(object):
         composite = image
 
         return composite
+    
+    def get_all_masks(self, image, predictions):
+        """
+        Adds the instances contours for each predicted object.
+        Each label has a different color.
+
+        Arguments:
+            image (np.ndarray): an image as returned by OpenCV
+            predictions (BoxList): the result of the computation by the model.
+                It should contain the field `mask` and `labels`.
+        """
+        masks = predictions.get_field("mask").numpy()
+        labels = predictions.get_field("labels")
+
+        colors = self.compute_colors_for_labels(labels).tolist()
+        mask_list = []
+        for mask, color in zip(masks, colors):
+            thresh = mask[0, :, :, None]
+            img = np.zeros(image.shape)
+            contours, hierarchy = cv2_util.findContours(
+                thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+            )
+            mask_image = cv2.fillPoly(img, pts = contours, color=(255,255,255))
+            mask_list.append(mask_image)
+        return mask_list
 
     def overlay_keypoints(self, image, predictions):
         keypoints = predictions.get_field("keypoints")

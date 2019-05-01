@@ -25,7 +25,7 @@ import json
 ROOT_DIR = '/data/sarthak_data/dataset'
 IMG_DIR = '/data/sarthak_data/dataset/jenga_recordings'
 ROOT_OUTDIR = '/data/sarthak_data/dataset'
-OUTFILE_NAME = 'instances_shapestacks_train2018'
+OUTFILE_NAME = 'instances_shapestacks_val_fixed_2018'
 
 INFO = {
     "description": "Example Dataset",
@@ -50,29 +50,30 @@ def get_num_blocks(scenario_name):
     return num_blocks
 
 def get_seg_file_name(block_num, img_file, scenario_dir):
-    base_filename = img_file.replace('rgb-', '').replace('-r=\d+-mono-0.png', '')
+    base_filename = img_file.replace('rgb-', '')
     base_filename = re.sub(r'-r=\d+-mono-0.png', '', base_filename)
 
     seg_file = 'vseg-{}-seg-{}.png'.format(base_filename, block_num)
     seg_file = os.path.join(scenario_dir, seg_file)
     return seg_file 
 
-def filter_for_jpeg(root, IMG_DIR):
+def filter_for_jpeg():
     
 
-    scenario_list_file = os.path.join(root, 'train.json')
+    scenario_list_file = os.path.join(ROOT_DIR, 'eval.json')
     with open(scenario_list_file) as f:
         scenario_list = json.load(f)
     
     # files = []
     img_seg_files_dict = {}
-    for scenario in scenario_list:
+    for scenario in scenario_list[0:int(len(scenario_list)/2)]:
         if scenario.endswith('_r') == False:
             scenario_path = os.path.join(IMG_DIR, scenario)
             for img_file in filter(
                 lambda f: f.startswith('rgb-') and f.endswith('-mono-0.png'),
                 os.listdir(scenario_path)):
                 if 'cam_1-' not in img_file:
+                # if 'cam_2-' in img_file or 'cam_3-' in img_file or 'cam_13-' in img_file:
                     img_file_path = os.path.join(scenario_path, img_file)
                     img_key = "{}/{}".format(scenario, img_file)
                     # files.append(img_file_path)
@@ -127,7 +128,7 @@ def main():
     segmentation_global_id = 1
 
     # filter for jpeg images
-    img_seg_files_dict = filter_for_jpeg(ROOT_DIR, IMG_DIR)
+    img_seg_files_dict = filter_for_jpeg()
     # print(img_seg_files_dict)
     img_size = (224,224)
 

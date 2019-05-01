@@ -182,11 +182,19 @@ class DatasetCatalog(object):
         },
         "shapestack_train_cocostyle": {
             "img_dir": "shapestacks/jenga_recordings",
-            "ann_file": "shapestacks/instances_shapestacks_train2018.json"
+            "ann_file": "shapestacks/instances_shapestacks_train_cam_limit_2018.json"
         },
         "shapestack_val_cocostyle": {
             "img_dir": "shapestacks/jenga_recordings",
-            "ann_file": "shapestacks/instances_shapestacks_eval2018.json"
+            "ann_file": "shapestacks/instances_shapestacks_val_cam_limit_2018.json"
+        },
+        "shapestack_train_fixed_cocostyle": {
+            "img_dir": "shapestacks/jenga_recordings",
+            "ann_file": "shapestacks/instances_shapestacks_train_fixed_2018.json"
+        },
+        "shapestack_val_fixed_cocostyle": {
+            "img_dir": "shapestacks/jenga_recordings",
+            "ann_file": "shapestacks/instances_shapestacks_val_fixed_2018.json"
         },
     }
 
