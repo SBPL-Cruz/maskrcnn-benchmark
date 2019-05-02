@@ -96,7 +96,7 @@ class COCODemo(object):
         result = image.copy()
         if self.show_mask_heatmaps:
             return self.create_mask_montage(result, top_predictions)
-        result = self.overlay_boxes(result, top_predictions)
+        # result = self.overlay_boxes(result, top_predictions)
         if self.cfg.MODEL.MASK_ON:
             mask_list = self.get_all_masks(result, top_predictions)
             result = self.overlay_mask(result, top_predictions)
@@ -241,11 +241,11 @@ class COCODemo(object):
         mask_list = []
         for mask, color in zip(masks, colors):
             thresh = mask[0, :, :, None]
-            img = np.zeros(image.shape)
+            img = np.zeros((image.shape[0], image.shape[1]))
             contours, hierarchy = cv2_util.findContours(
                 thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
             )
-            mask_image = cv2.fillPoly(img, pts = contours, color=(255,255,255))
+            mask_image = cv2.fillPoly(img, pts = contours, color=(255))
             mask_list.append(mask_image)
         return mask_list
 
@@ -314,7 +314,7 @@ class COCODemo(object):
             x, y = box[:2]
             s = template.format(label, score)
             cv2.putText(
-                image, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1
+                image, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, .3, (255, 255, 255), 1
             )
 
         return image

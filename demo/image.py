@@ -11,6 +11,7 @@ sys.path.append('..')
 from tools import convert_shapestacks_coco
 import random
 import os
+from PIL import Image
 
 # /data/sarthak_data/dataset/jenga_recordings/env_jenga-h=5-id=02798-n=12-r=5/rgb-w=0-f=0-l=0-c=original-cam_5-r=5-mono-0.png
 # /data/sarthak_data/dataset/jenga_recordings/env_jenga-h=7-id=02539-n=16-r=7/rgb-w=0-f=0-l=0-c=original-cam_8-r=7-mono-0.png
@@ -82,12 +83,18 @@ def main():
     img = cv2.imread(img_path)
 
     composite, mask_list = coco_demo.run_on_opencv_image(img)
-    # print("Time: {:.2f} s / img".format(time.time() - start_time))
-    cv2.imwrite('demo/output/original.png', img)
-    cv2.imwrite('demo/output/composite.png', composite)
+    if not os.path.exists('demo/output/'):
+        os.makedirs('demo/output/')
+
+    
+    im_name = "rgb-w=0-f=0-l=0-c=original-cam_8-r=12-mono-0"
+    cv2.imwrite('demo/output/{}.png'.format(im_name), cv2.resize(img,(224,224)))
+    cv2.imwrite('demo/output/composite-{}.png'.format(im_name), cv2.resize(composite,(224,224)))
 
     for i in range(len(mask_list)):
-        cv2.imwrite('demo/output/mask-{}.png'.format(i), mask_list[i])
+        im_name = "vseg-w=0-f=0-l=0-c=original-cam_8-seg-{}".format(i)
+        cv2.imwrite('demo/output/visualize-{}.png'.format(im_name), cv2.resize(mask_list[i], (224,224)))
+        Image.fromarray(mask_list[i]).resize((224,224)).convert('1').save('demo/output/{}.png'.format(im_name))
 
     # cv2.imshow("COCO detections", composite)
     # if cv2.waitKey(1) == 27:
