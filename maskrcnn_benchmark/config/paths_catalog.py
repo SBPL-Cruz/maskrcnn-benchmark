@@ -196,6 +196,10 @@ class DatasetCatalog(object):
             "img_dir": "shapestacks/jenga_recordings",
             "ann_file": "shapestacks/instances_shapestacks_val_fixed_2018.json"
         },
+        "fat_pose_2018_train": {
+            "img_dir": "fat/mixed/extra",
+            "ann_file": "shapestacks/instances_fat_train_pose_2018.json"
+        },
     }
 
     @staticmethod

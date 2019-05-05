@@ -26,18 +26,18 @@ IMAGE_DIR_LIST = [
 #        os.path.join(ROOT_DIR, "kitchen_0"), 
 #        os.path.join(ROOT_DIR, "kitchen_1"),
         os.path.join(ROOT_DIR, "kitchen_2"),
-        os.path.join(ROOT_DIR, "kitchen_3"),
-        os.path.join(ROOT_DIR, "kitchen_4"),
-        os.path.join(ROOT_DIR, "kitedemo_0"),
-        os.path.join(ROOT_DIR, "kitedemo_1"),
-        os.path.join(ROOT_DIR, "kitedemo_2"),
-        os.path.join(ROOT_DIR, "kitedemo_3"),
-        os.path.join(ROOT_DIR, "kitedemo_4"),
-        os.path.join(ROOT_DIR, "temple_0"),
-        os.path.join(ROOT_DIR, "temple_1"),
-        os.path.join(ROOT_DIR, "temple_2"),
-        os.path.join(ROOT_DIR, "temple_3"),
-        os.path.join(ROOT_DIR, "temple_4")
+        # os.path.join(ROOT_DIR, "kitchen_3"),
+        # os.path.join(ROOT_DIR, "kitchen_4"),
+        # os.path.join(ROOT_DIR, "kitedemo_0"),
+        # os.path.join(ROOT_DIR, "kitedemo_1"),
+        # os.path.join(ROOT_DIR, "kitedemo_2"),
+        # os.path.join(ROOT_DIR, "kitedemo_3"),
+        # os.path.join(ROOT_DIR, "kitedemo_4"),
+        # os.path.join(ROOT_DIR, "temple_0"),
+        # os.path.join(ROOT_DIR, "temple_1"),
+        # os.path.join(ROOT_DIR, "temple_2"),
+        # os.path.join(ROOT_DIR, "temple_3"),
+        # os.path.join(ROOT_DIR, "temple_4")
 ]
 #IMAGE_DIR_LIST = [
 #"002_master_chef_can_16k/kitchen_0",
@@ -671,8 +671,21 @@ IMAGE_DIR_LIST = [
 #"061_foam_brick_16k/temple_4"
 #]
 #ANNOTATION_DIR = os.path.join(ROOT_DIR, "kitchen_0")
+from pyquaternion import Quaternion
+from transformations import euler_from_matrix
+import math
+from sphere_fibonacci_grid_points import sphere_fibonacci_grid_points
+from tqdm import tqdm, trange
+
+def polar2cart(r, theta, phi):
+    return [
+         r * math.sin(theta) * math.cos(phi),
+         r * math.sin(theta) * math.sin(phi),
+         r * math.cos(theta)
+    ]
+
 ROOT_OUTDIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/train'
-OUTFILE_NAME = 'instances_fat_train2018'
+OUTFILE_NAME = 'instances_fat_train_pose_2018'
 
 #ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/val'
 #IMAGE_DIR = os.path.join(ROOT_DIR, "kitchen_3")
@@ -726,9 +739,31 @@ def filter_for_labels(root, files, image_filename):
 
     return files
 
+def find_viewpoint_id(sphere_points, point):
+    distances = np.linalg.norm(sphere_points - point, axis=1)
+    viewpoint_index = np.argmin(distances)
+    # print(distances[viewpoint_index])
+    return viewpoint_index
+    # print(distances.shape[0])
+
+def find_inplane_rotation_id(inplane_rot_angles, angle):
+    distances = abs(inplane_rot_angles - angle)
+    viewpoint_index = np.argmin(distances)
+    # print("Angle : {}, All angles : {}, Closest : {}".format(
+    #     angle, inplane_rot_angles, inplane_rot_angles[viewpoint_index])
+    # )
+    return viewpoint_index
+    # print(distances.shape[0])
+
 def main():
 
+    ng = 642
+    print ( '' )
+    print ( '  Number of points NG = %d' % ( ng ) )
 
+    viewpoints_xyz = sphere_fibonacci_grid_points ( ng )
+    # inplane_rot_angles = np.linspace(-math.pi/4, math.pi/4, 19)
+    inplane_rot_angles = np.linspace(-math.pi, math.pi, 68)
     
     object_settings_file = Path(os.path.join(IMAGE_DIR_LIST[0], "_object_settings.json"))
     if object_settings_file.is_file():
@@ -745,11 +780,23 @@ def main():
     else:
         raise Exception("Object settings file not found")
             
-                
+
+    VIEWPOINTS = [{
+                'id': i,
+                'name': viewpoints_xyz[i].tolist(),
+            } for i in range(0, len(viewpoints_xyz))]
+
+    INPLANE_ROTATIONS = [{
+                'id': i,
+                'name': inplane_rot_angles[i],
+            } for i in range(0, len(inplane_rot_angles))]
+
     coco_output = {
         "info": INFO,
         "licenses": LICENSES,
         "categories": CATEGORIES,
+        "viewpoints" : VIEWPOINTS,
+        "inplate_rotations" : INPLANE_ROTATIONS,
         "images": [],
         "annotations": []
     }
@@ -761,20 +808,19 @@ def main():
     for IMAGE_DIR in IMAGE_DIR_LIST:
         for root, _, files in os.walk(IMAGE_DIR):
             image_files = filter_for_jpeg(root, files)
+            dir_name = os.path.basename(IMAGE_DIR)
     
             # go through each image
-            for image_filename in image_files:
-#                image = Image.open(image_filename)
-#                image_out_filename = '{}_{}'.format(os.path.basename(IMAGE_DIR), os.path.basename(image_filename))
-                image_out_filename =  os.path.basename(image_filename)
+            for ii in trange(len(image_files)):
+                image_filename = image_files[ii]
+                image_out_filename =  os.path.join(dir_name, os.path.basename(image_filename))
                 img_size = (960,540)
                 image_info = pycococreatortools.create_image_info(
-#                    image_global_id, os.path.basename(image_out_filename), image.size)
-                    image_global_id, os.path.basename(image_out_filename), img_size)
-    #            coco_output["images"].append(image_info)
-#                plt.figure()
-#                skimage.io.imshow(skimage.io.imread(image_filename))
-#                plt.show()
+                    image_global_id, image_out_filename, img_size
+                )
+#               plt.figure()
+#               skimage.io.imshow(skimage.io.imread(image_filename))
+#               plt.show()
                 # filter for associated png annotations
                 for root, _, files in os.walk(IMAGE_DIR):
                     segmentation_image_files = filter_for_annotations(root, files, image_filename)
@@ -784,64 +830,67 @@ def main():
                     segmentation_ids = []
                     # go through each associated json file containing objects data
                     for label_filename in label_files:
-                        print("File %d - %s"% (image_global_id, label_filename))
+                        # print("File %d - %s"% (image_global_id, label_filename))
                         my_file = Path(label_filename)
     
                         if my_file.is_file():
                             with open(label_filename) as file:
                                 label_data = json.load(file)
                                 for i in range(0, len(label_data['objects'])):
+                                    # print(label_data['objects'][i].keys())
                                     class_name = label_data['objects'][i]['class']
                                     class_bounding_box = label_data['objects'][i]['bounding_box']
+                                    quat = label_data['objects'][i]['quaternion_xyzw']
+                                    q = Quaternion(quat[3], quat[0], quat[1], quat[2])
+                                    # print("angles : {}".format(q.angle))
+                                    
+                                    angles = euler_from_matrix(q.rotation_matrix)
+                                    xyz_coord = (polar2cart(1, angles[1], angles[2]))
+
+                                    viewpoint_id = find_viewpoint_id(viewpoints_xyz, xyz_coord)
+                                    inplane_rotation_id = find_inplane_rotation_id(inplane_rot_angles, angles[0])
+
                                     class_label = [x['id'] for x in CATEGORIES if x['name'] in class_name][0]
-                                    if class_label < 0 or class_label >= 21:
-                                        exit(1)
                                     segmentation_id = [x['segmentation_class_id'] for x in SEGMENTATION_DATA if x['class'] in class_name][0]
     
                                     boxes.append(class_bounding_box['top_left'] + class_bounding_box['bottom_right'])
                                     labels.append(class_label)     
                                     segmentation_ids.append([x['segmentation_class_id'] for x in SEGMENTATION_DATA if x['class'] in class_name][0])
-    #                        if len(boxes) > 0 and len(labels) > 0 and len(boxes) == len(labels):
-    #                                print(segmentation_image_files)
+
                                     # Create binary masks from segmentation image
                                     for segmentation_image_file in segmentation_image_files:
                                         segmentation_image = skimage.io.imread(segmentation_image_file)
-    #                                    for segmentation_id in segmentation_ids:
                                         binary_mask = np.copy(segmentation_image)
                                         binary_mask[binary_mask != segmentation_id] = 0
                                         binary_mask[binary_mask == segmentation_id] = 1
-#                                        skimage.io.imshow(binary_mask, cmap=plt.cm.gray)
-#                                        plt.show()
-    
-                                    
+                                        # skimage.io.imshow(binary_mask, cmap=plt.cm.gray)
+                                        # plt.show()
                                         # TODO : check if its actually a crowd in case of multiple instances of one object type
-    #                                        class_label = [x['class'] for x in SEGMENTATION_DATA if x['segmentation_class_id'] in segmentation_id][0]
+                                        # class_label = [x['class'] for x in SEGMENTATION_DATA if x['segmentation_class_id'] in segmentation_id][0]
                                         category_info = {'id': class_label, 'is_crowd': 0}
         
                                         
-                                        # Transpose to match axis of PIL with skimage
-#                                        binary_mask = np.transpose(binary_mask) 
                                         annotation_info = pycococreatortools.create_annotation_info(
                                             segmentation_global_id, image_global_id, category_info, binary_mask,
                                             img_size, tolerance=2)
-        #                                
+                                        
+                                        # print(annotation_info)
+
                                         if annotation_info is not None:
+                                            annotation_info['viewpoint_id'] = int(viewpoint_id)
+                                            annotation_info['inplane_rotation_id'] = int(inplane_rotation_id)
                                             coco_output["annotations"].append(annotation_info)
                                             coco_output["images"].append(image_info)
-#                                            image.save(os.path.join(ROOT_OUTDIR, image_out_filename))
                                         else:
-                                            print("File %s doesn't have boxes or labels in json file" % image_filename)
-        #                                
+                                            tqdm.write("File %s doesn't have boxes or labels in json file" % image_filename)
                                         segmentation_global_id = segmentation_global_id + 1
-    #                        else:
-    #                            print("File %s doesn't have boxes or labels in json file" % image_filename)
                         else:
-                            print("File %s doesn't have a label file" % image_filename)
+                            tqdm.write("File %s doesn't have a label file" % image_filename)
                         
     
                 image_global_id = image_global_id + 1
 
-        with open('{}/{}.json'.format(IMAGE_DIR, OUTFILE_NAME), 'w') as output_json_file:
+        with open('{}/{}.json'.format(ROOT_DIR, OUTFILE_NAME), 'w') as output_json_file:
             json.dump(coco_output, output_json_file)
 
 
