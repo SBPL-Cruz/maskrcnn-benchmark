@@ -26,18 +26,18 @@ IMAGE_DIR_LIST = [
 #        os.path.join(ROOT_DIR, "kitchen_0"), 
 #        os.path.join(ROOT_DIR, "kitchen_1"),
         os.path.join(ROOT_DIR, "kitchen_2"),
-        # os.path.join(ROOT_DIR, "kitchen_3"),
-        # os.path.join(ROOT_DIR, "kitchen_4"),
-        # os.path.join(ROOT_DIR, "kitedemo_0"),
-        # os.path.join(ROOT_DIR, "kitedemo_1"),
-        # os.path.join(ROOT_DIR, "kitedemo_2"),
-        # os.path.join(ROOT_DIR, "kitedemo_3"),
-        # os.path.join(ROOT_DIR, "kitedemo_4"),
-        # os.path.join(ROOT_DIR, "temple_0"),
-        # os.path.join(ROOT_DIR, "temple_1"),
-        # os.path.join(ROOT_DIR, "temple_2"),
-        # os.path.join(ROOT_DIR, "temple_3"),
-        # os.path.join(ROOT_DIR, "temple_4")
+        os.path.join(ROOT_DIR, "kitchen_3"),
+        os.path.join(ROOT_DIR, "kitchen_4"),
+        os.path.join(ROOT_DIR, "kitedemo_0"),
+        os.path.join(ROOT_DIR, "kitedemo_1"),
+        os.path.join(ROOT_DIR, "kitedemo_2"),
+        os.path.join(ROOT_DIR, "kitedemo_3"),
+        os.path.join(ROOT_DIR, "kitedemo_4"),
+        os.path.join(ROOT_DIR, "temple_0"),
+        os.path.join(ROOT_DIR, "temple_1"),
+        os.path.join(ROOT_DIR, "temple_2"),
+        os.path.join(ROOT_DIR, "temple_3"),
+        os.path.join(ROOT_DIR, "temple_4")
 ]
 #IMAGE_DIR_LIST = [
 #"002_master_chef_can_16k/kitchen_0",
@@ -677,20 +677,18 @@ import math
 from sphere_fibonacci_grid_points import sphere_fibonacci_grid_points
 from tqdm import tqdm, trange
 
-def polar2cart(r, theta, phi):
-    return [
-         r * math.sin(theta) * math.cos(phi),
-         r * math.sin(theta) * math.sin(phi),
-         r * math.cos(theta)
-    ]
+ng = 642
+print ( '' )
+print ( '  Number of points NG = %d' % ( ng ) )
+
+viewpoints_xyz = sphere_fibonacci_grid_points(ng)
+# inplane_rot_angles = np.linspace(-math.pi/4, math.pi/4, 19)
+inplane_rot_angles = np.linspace(-math.pi, math.pi, 68)
+
+
 
 ROOT_OUTDIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/train'
 OUTFILE_NAME = 'instances_fat_train_pose_2018'
-
-#ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/val'
-#IMAGE_DIR = os.path.join(ROOT_DIR, "kitchen_3")
-#ANNOTATION_DIR = os.path.join(ROOT_DIR, "kitchen_3")
-#OUTFILE_NAME = 'instances_fat_val2018'
 
 INFO = {
     "description": "Example Dataset",
@@ -708,6 +706,19 @@ LICENSES = [
         "url": "http://creativecommons.org/licenses/by-nc-sa/2.0/"
     }
 ]
+
+def cart2polar(point):
+    r = math.sqrt(point[0]**2 + point[1]**2 + point[2]**2)
+    theta = math.acos(point[2]/r)
+    phi = math.atan2(point[1], point[0])
+    return [r, theta, phi]
+
+def polar2cart(r, theta, phi):
+    return [
+         r * math.sin(theta) * math.cos(phi),
+         r * math.sin(theta) * math.sin(phi),
+         r * math.cos(theta)
+    ]
 
 def filter_for_jpeg(root, files):
     file_types = ['*.left.jpeg', '*.left.jpg']
@@ -739,6 +750,12 @@ def filter_for_labels(root, files, image_filename):
 
     return files
 
+def get_viewpoint_from_id(id):
+    return viewpoints_xyz[id]
+
+def get_inplane_rotation_from_id(id):
+    return inplane_rot_angles[id]
+
 def find_viewpoint_id(sphere_points, point):
     distances = np.linalg.norm(sphere_points - point, axis=1)
     viewpoint_index = np.argmin(distances)
@@ -757,13 +774,7 @@ def find_inplane_rotation_id(inplane_rot_angles, angle):
 
 def main():
 
-    ng = 642
-    print ( '' )
-    print ( '  Number of points NG = %d' % ( ng ) )
 
-    viewpoints_xyz = sphere_fibonacci_grid_points ( ng )
-    # inplane_rot_angles = np.linspace(-math.pi/4, math.pi/4, 19)
-    inplane_rot_angles = np.linspace(-math.pi, math.pi, 68)
     
     object_settings_file = Path(os.path.join(IMAGE_DIR_LIST[0], "_object_settings.json"))
     if object_settings_file.is_file():

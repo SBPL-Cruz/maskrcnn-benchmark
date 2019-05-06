@@ -20,6 +20,7 @@ class ROIBoxHead(torch.nn.Module):
             cfg, self.feature_extractor.out_channels)
         self.post_processor = make_roi_box_post_processor(cfg)
         self.loss_evaluator = make_roi_box_loss_evaluator(cfg)
+        self.cfg = cfg.clone()
 
     def forward(self, features, proposals, targets=None):
         """
@@ -46,19 +47,33 @@ class ROIBoxHead(torch.nn.Module):
         # feature_extractor generally corresponds to the pooler + heads
         x = self.feature_extractor(features, proposals)
         # final classifier that converts the features into predictions
-        class_logits, box_regression = self.predictor(x)
+        viewpoint_logits = None
+        inplane_rotation_logits = None
+        if self.cfg.MODEL.POSE_ON:
+            class_logits, box_regression, viewpoint_logits, inplane_rotation_logits = self.predictor(x)
+        else:
+            class_logits, box_regression = self.predictor(x)
 
         if not self.training:
-            result = self.post_processor((class_logits, box_regression), proposals)
+            result = self.post_processor(
+                (class_logits, box_regression, viewpoint_logits, inplane_rotation_logits), proposals
+            )
             return x, result, {}
 
-        loss_classifier, loss_box_reg = self.loss_evaluator(
-            [class_logits], [box_regression]
+        loss_viewpoint, loss_inplane_rotation = None, None
+
+        loss_classifier, loss_box_reg, loss_viewpoint, loss_inplane_rotation = self.loss_evaluator(
+            [class_logits], [box_regression], [viewpoint_logits], [inplane_rotation_logits]
         )
         return (
             x,
             proposals,
-            dict(loss_classifier=loss_classifier, loss_box_reg=loss_box_reg),
+            dict(
+                loss_classifier=loss_classifier, 
+                loss_box_reg=loss_box_reg,
+                loss_viewpoint=loss_viewpoint,
+                loss_inplane_rotation=loss_inplane_rotation
+            ),
         )
 
 

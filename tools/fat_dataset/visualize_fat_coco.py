@@ -6,13 +6,6 @@ import skimage.io as io
 import matplotlib.pyplot as plt
 import pylab
 from convert_fat_coco import *
-from lib.render_glumpy.render_py import Render_Py
-from lib.utils.mkdir_if_missing import mkdir_if_missing
-from lib.pair_matching import RT_transform
-from tqdm import tqdm
-import yaml
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-import cv2
 
 image_directory = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/'
 annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_2018.json'

@@ -196,9 +196,9 @@ class DatasetCatalog(object):
             "img_dir": "shapestacks/jenga_recordings",
             "ann_file": "shapestacks/instances_shapestacks_val_fixed_2018.json"
         },
-        "fat_pose_2018_train": {
+        "fat_pose_2018_train_cocostyle": {
             "img_dir": "fat/mixed/extra",
-            "ann_file": "shapestacks/instances_fat_train_pose_2018.json"
+            "ann_file": "fat/mixed/extra/instances_fat_train_pose_2018.json"
         },
     }
 
@@ -227,17 +227,17 @@ class DatasetCatalog(object):
                 args=args,
             )
 
-        elif "fat" in name:
-            data_dir = DatasetCatalog.DATA_DIR
-            attrs = DatasetCatalog.DATASETS[name]
-            args = dict(
-                data_dir=os.path.join(data_dir, attrs["data_dir"]),
-                split=attrs["split"],
-            )
-            return dict(
-                factory="FATDataset",
-                args=args,
-            )
+        # elif "fat" in name:
+        #     data_dir = DatasetCatalog.DATA_DIR
+        #     attrs = DatasetCatalog.DATASETS[name]
+        #     args = dict(
+        #         data_dir=os.path.join(data_dir, attrs["data_dir"]),
+        #         split=attrs["split"],
+        #     )
+        #     return dict(
+        #         factory="FATDataset",
+        #         args=args,
+        #     )
         raise RuntimeError("Dataset not available: {}".format(name))
 
 

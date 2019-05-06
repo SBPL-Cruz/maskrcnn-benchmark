@@ -23,7 +23,8 @@ class FastRCNNLossComputation(object):
         proposal_matcher, 
         fg_bg_sampler, 
         box_coder, 
-        cls_agnostic_bbox_reg=False
+        cls_agnostic_bbox_reg=False,
+        pose_on=False
     ):
         """
         Arguments:
@@ -35,12 +36,13 @@ class FastRCNNLossComputation(object):
         self.fg_bg_sampler = fg_bg_sampler
         self.box_coder = box_coder
         self.cls_agnostic_bbox_reg = cls_agnostic_bbox_reg
+        self.pose_on = pose_on
 
     def match_targets_to_proposals(self, proposal, target):
         match_quality_matrix = boxlist_iou(target, proposal)
         matched_idxs = self.proposal_matcher(match_quality_matrix)
         # Fast RCNN only need "labels" field for selecting the targets
-        target = target.copy_with_fields("labels")
+        target = target.copy_with_fields(["labels", "viewpoints", "inplane_rotations"], skip_missing=True)
         # get the targets corresponding GT for each proposal
         # NB: need to clamp the indices because we can have a single
         # GT in the image, and matched_idxs can be -2, which goes
@@ -51,6 +53,8 @@ class FastRCNNLossComputation(object):
 
     def prepare_targets(self, proposals, targets):
         labels = []
+        viewpoints = []
+        inplane_rotations = []
         regression_targets = []
         for proposals_per_image, targets_per_image in zip(proposals, targets):
             matched_targets = self.match_targets_to_proposals(
@@ -61,6 +65,14 @@ class FastRCNNLossComputation(object):
             labels_per_image = matched_targets.get_field("labels")
             labels_per_image = labels_per_image.to(dtype=torch.int64)
 
+            # print(matched_targets.fields())
+            if matched_targets.has_field('viewpoints') \
+                and matched_targets.has_field('inplane_rotations'):
+                viewpoints_per_image = matched_targets.get_field("viewpoints")
+                viewpoints_per_image = viewpoints_per_image.to(dtype=torch.int64)
+                inplane_rotations_per_image = matched_targets.get_field("inplane_rotations")
+                inplane_rotations_per_image = inplane_rotations_per_image.to(dtype=torch.int64)
+
             # Label background (below the low threshold)
             bg_inds = matched_idxs == Matcher.BELOW_LOW_THRESHOLD
             labels_per_image[bg_inds] = 0
@@ -68,6 +80,16 @@ class FastRCNNLossComputation(object):
             # Label ignore proposals (between low and high thresholds)
             ignore_inds = matched_idxs == Matcher.BETWEEN_THRESHOLDS
             labels_per_image[ignore_inds] = -1  # -1 is ignored by sampler
+
+            if matched_targets.has_field('viewpoints') \
+                and matched_targets.has_field('inplane_rotations'):
+                viewpoints_per_image[bg_inds] = 0
+                viewpoints_per_image[ignore_inds] = -1
+                viewpoints.append(viewpoints_per_image)
+                inplane_rotations_per_image[bg_inds] = 0
+                inplane_rotations_per_image[ignore_inds] = -1
+                inplane_rotations.append(inplane_rotations_per_image)
+
 
             # compute regression targets
             regression_targets_per_image = self.box_coder.encode(
@@ -77,7 +99,10 @@ class FastRCNNLossComputation(object):
             labels.append(labels_per_image)
             regression_targets.append(regression_targets_per_image)
 
-        return labels, regression_targets
+        if self.pose_on:
+            return labels, regression_targets, viewpoints, inplane_rotations      
+        else:
+            return labels, regression_targets
 
     def subsample(self, proposals, targets):
         """
@@ -90,18 +115,34 @@ class FastRCNNLossComputation(object):
             targets (list[BoxList])
         """
 
-        labels, regression_targets = self.prepare_targets(proposals, targets)
+        if self.pose_on:
+            labels, regression_targets, viewpoints, inplane_rotations = \
+                self.prepare_targets(proposals, targets)
+        else:  
+            labels, regression_targets = self.prepare_targets(proposals, targets)
         sampled_pos_inds, sampled_neg_inds = self.fg_bg_sampler(labels)
 
         proposals = list(proposals)
         # add corresponding label and regression_targets information to the bounding boxes
-        for labels_per_image, regression_targets_per_image, proposals_per_image in zip(
-            labels, regression_targets, proposals
-        ):
-            proposals_per_image.add_field("labels", labels_per_image)
-            proposals_per_image.add_field(
-                "regression_targets", regression_targets_per_image
-            )
+        if self.pose_on:
+            for labels_per_image, viewpoints_per_image, inplane_rotations_per_image, \
+                regression_targets_per_image, proposals_per_image \
+                in zip(labels, viewpoints, inplane_rotations, regression_targets, proposals):
+
+                proposals_per_image.add_field("labels", labels_per_image)
+                proposals_per_image.add_field("viewpoints", viewpoints_per_image)
+                proposals_per_image.add_field("inplane_rotations", inplane_rotations_per_image)
+                proposals_per_image.add_field(
+                    "regression_targets", regression_targets_per_image
+                )
+        else:
+            for labels_per_image, regression_targets_per_image, proposals_per_image in zip(
+                labels, regression_targets, proposals
+            ):
+                proposals_per_image.add_field("labels", labels_per_image)
+                proposals_per_image.add_field(
+                    "regression_targets", regression_targets_per_image
+                )
 
         # distributed sampled proposals, that were obtained on all feature maps
         # concatenated via the fg_bg_sampler, into individual feature map levels
@@ -115,7 +156,7 @@ class FastRCNNLossComputation(object):
         self._proposals = proposals
         return proposals
 
-    def __call__(self, class_logits, box_regression):
+    def __call__(self, class_logits, box_regression, viewpoint_logits=None, inplane_rotation_logits=None):
         """
         Computes the loss for Faster R-CNN.
         This requires that the subsample method has been called beforehand.
@@ -131,6 +172,7 @@ class FastRCNNLossComputation(object):
 
         class_logits = cat(class_logits, dim=0)
         box_regression = cat(box_regression, dim=0)
+        
         device = class_logits.device
 
         if not hasattr(self, "_proposals"):
@@ -139,11 +181,23 @@ class FastRCNNLossComputation(object):
         proposals = self._proposals
 
         labels = cat([proposal.get_field("labels") for proposal in proposals], dim=0)
+
         regression_targets = cat(
             [proposal.get_field("regression_targets") for proposal in proposals], dim=0
         )
 
         classification_loss = F.cross_entropy(class_logits, labels)
+
+        viewpoint_loss, inplane_rotation_loss = None, None
+        if self.pose_on:
+            viewpoint_logits = cat(viewpoint_logits, dim=0)
+            inplane_rotation_logits = cat(inplane_rotation_logits, dim=0)
+            
+            viewpoints = cat([proposal.get_field("viewpoints") for proposal in proposals], dim=0)
+            inplane_rotations = cat([proposal.get_field("inplane_rotations") for proposal in proposals], dim=0)
+            
+            viewpoint_loss = F.cross_entropy(viewpoint_logits, viewpoints)
+            inplane_rotation_loss = F.cross_entropy(inplane_rotation_logits, inplane_rotations)
 
         # get indices that correspond to the regression targets for
         # the corresponding ground truth labels, to be used with
@@ -164,7 +218,7 @@ class FastRCNNLossComputation(object):
         )
         box_loss = box_loss / labels.numel()
 
-        return classification_loss, box_loss
+        return classification_loss, box_loss, viewpoint_loss, inplane_rotation_loss
 
 
 def make_roi_box_loss_evaluator(cfg):
@@ -182,12 +236,14 @@ def make_roi_box_loss_evaluator(cfg):
     )
 
     cls_agnostic_bbox_reg = cfg.MODEL.CLS_AGNOSTIC_BBOX_REG
+    pose_on = cfg.MODEL.POSE_ON
 
     loss_evaluator = FastRCNNLossComputation(
         matcher, 
         fg_bg_sampler, 
         box_coder, 
-        cls_agnostic_bbox_reg
+        cls_agnostic_bbox_reg,
+        pose_on
     )
 
     return loss_evaluator

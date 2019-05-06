@@ -56,6 +56,39 @@ class FPNPredictor(nn.Module):
 
         return scores, bbox_deltas
 
+@registry.ROI_BOX_PREDICTOR.register("FPNPredictorWithPose")
+class FPNPredictorWithPose(nn.Module):
+    def __init__(self, cfg, in_channels):
+        super(FPNPredictorWithPose, self).__init__()
+        num_classes = cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
+        num_viewpoints = cfg.MODEL.ROI_BOX_HEAD.NUM_VIEWPOINTS
+        num_inplane_rotations = cfg.MODEL.ROI_BOX_HEAD.NUM_INPLANE_ROTATIONS
+        representation_size = in_channels
+
+        self.cls_score = nn.Linear(representation_size, num_classes)
+        num_bbox_reg_classes = 2 if cfg.MODEL.CLS_AGNOSTIC_BBOX_REG else num_classes
+        self.bbox_pred = nn.Linear(representation_size, num_bbox_reg_classes * 4)
+
+        self.viewpoint_score = nn.Linear(representation_size, num_viewpoints)
+        self.inplane_rotation_score = nn.Linear(representation_size, num_inplane_rotations)
+
+        nn.init.normal_(self.cls_score.weight, std=0.01)
+        nn.init.normal_(self.viewpoint_score.weight, std=0.01)
+        nn.init.normal_(self.inplane_rotation_score.weight, std=0.01)
+        nn.init.normal_(self.bbox_pred.weight, std=0.001)
+        for l in [self.cls_score, self.bbox_pred]:
+            nn.init.constant_(l.bias, 0)
+
+    def forward(self, x):
+        if x.ndimension() == 4:
+            assert list(x.shape[2:]) == [1, 1]
+            x = x.view(x.size(0), -1)
+        scores = self.cls_score(x)
+        viewpoint_scores = self.viewpoint_score(x)
+        inplane_rotation_scores = self.inplane_rotation_score(x)
+        bbox_deltas = self.bbox_pred(x)
+
+        return scores, bbox_deltas, viewpoint_scores, inplane_rotation_scores
 
 def make_roi_box_predictor(cfg, in_channels):
     func = registry.ROI_BOX_PREDICTOR[cfg.MODEL.ROI_BOX_HEAD.PREDICTOR]

@@ -22,7 +22,8 @@ class PostProcessor(nn.Module):
         nms=0.5,
         detections_per_img=100,
         box_coder=None,
-        cls_agnostic_bbox_reg=False
+        cls_agnostic_bbox_reg=False,
+        pose_on=False
     ):
         """
         Arguments:
@@ -39,6 +40,7 @@ class PostProcessor(nn.Module):
             box_coder = BoxCoder(weights=(10., 10., 5., 5.))
         self.box_coder = box_coder
         self.cls_agnostic_bbox_reg = cls_agnostic_bbox_reg
+        self.pose_on = pose_on
 
     def forward(self, x, boxes):
         """
@@ -52,8 +54,12 @@ class PostProcessor(nn.Module):
             results (list[BoxList]): one BoxList for each image, containing
                 the extra fields labels and scores
         """
-        class_logits, box_regression = x
+        class_logits, box_regression, viewpoint_logits, inplane_rotation_logits = x
         class_prob = F.softmax(class_logits, -1)
+
+        if self.pose_on:
+            viewpoint_prob = F.softmax(viewpoint_logits, -1)
+            inplane_rotation_prob = F.softmax(inplane_rotation_logits, -1)
 
         # TODO think about a representation of batch of boxes
         image_shapes = [box.size for box in boxes]
@@ -72,18 +78,31 @@ class PostProcessor(nn.Module):
 
         proposals = proposals.split(boxes_per_image, dim=0)
         class_prob = class_prob.split(boxes_per_image, dim=0)
+        if self.pose_on:
+            viewpoint_prob = viewpoint_prob.split(boxes_per_image, dim=0)
+            inplane_rotation_prob = inplane_rotation_prob.split(boxes_per_image, dim=0)
+
 
         results = []
-        for prob, boxes_per_img, image_shape in zip(
-            class_prob, proposals, image_shapes
-        ):
-            boxlist = self.prepare_boxlist(boxes_per_img, prob, image_shape)
-            boxlist = boxlist.clip_to_image(remove_empty=False)
-            boxlist = self.filter_results(boxlist, num_classes)
-            results.append(boxlist)
+        if self.pose_on:
+            for c_prob, boxes_per_img, image_shape in zip(
+                class_prob, proposals, image_shapes
+            ):
+                boxlist = self.prepare_boxlist(boxes_per_img, c_prob, image_shape)
+                boxlist = boxlist.clip_to_image(remove_empty=False)
+                boxlist = self.filter_results(boxlist, num_classes)
+                results.append(boxlist)
+        else:
+            for c_prob, v_prob, i_prob, boxes_per_img, image_shape in zip(
+                class_prob, viewpoint_prob, inplane_rotation_prob, proposals, image_shapes
+            ):
+                boxlist = self.prepare_boxlist(boxes_per_img, c_prob, image_shape, v_prob, i_prob)
+                boxlist = boxlist.clip_to_image(remove_empty=False)
+                boxlist = self.filter_results(boxlist, num_classes)
+                results.append(boxlist)
         return results
 
-    def prepare_boxlist(self, boxes, scores, image_shape):
+    def prepare_boxlist(self, boxes, scores, image_shape, viewpoint_scores=None, inplane_rotation_scores=None):
         """
         Returns BoxList from `boxes` and adds probability scores information
         as an extra field
@@ -100,6 +119,10 @@ class PostProcessor(nn.Module):
         scores = scores.reshape(-1)
         boxlist = BoxList(boxes, image_shape, mode="xyxy")
         boxlist.add_field("scores", scores)
+        if viewpoint_scores is not None:
+            boxlist.add_field("viewpoint_scores", viewpoint_scores)
+        if viewpoint_scores is not None:
+            boxlist.add_field("inplane_rotation_scores", inplane_rotation_scores)
         return boxlist
 
     def filter_results(self, boxlist, num_classes):
@@ -148,6 +171,7 @@ class PostProcessor(nn.Module):
 
 def make_roi_box_post_processor(cfg):
     use_fpn = cfg.MODEL.ROI_HEADS.USE_FPN
+    pose_on = cfg.MODEL.POSE_ON
 
     bbox_reg_weights = cfg.MODEL.ROI_HEADS.BBOX_REG_WEIGHTS
     box_coder = BoxCoder(weights=bbox_reg_weights)
@@ -162,6 +186,7 @@ def make_roi_box_post_processor(cfg):
         nms_thresh,
         detections_per_img,
         box_coder,
-        cls_agnostic_bbox_reg
+        cls_agnostic_bbox_reg,
+        pose_on
     )
     return postprocessor
