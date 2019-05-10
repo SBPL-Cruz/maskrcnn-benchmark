@@ -30,9 +30,9 @@ from dipy.core.geometry import cart2sphere, sphere2cart, sphere_distance
 
 ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra'
 IMAGE_DIR_LIST = [
-        # os.path.join(ROOT_DIR, "kitchen_0"), 
-        # os.path.join(ROOT_DIR, "kitchen_1"),
-        os.path.join(ROOT_DIR, "kitchen_2"),
+        os.path.join(ROOT_DIR, "kitchen_0"), 
+        os.path.join(ROOT_DIR, "kitchen_1"),
+        # os.path.join(ROOT_DIR, "kitchen_2"),
         # os.path.join(ROOT_DIR, "kitchen_3"),
         # os.path.join(ROOT_DIR, "kitchen_4"),
         # os.path.join(ROOT_DIR, "kitedemo_0"),
@@ -59,7 +59,8 @@ inplane_rot_angles = np.linspace(-math.pi, math.pi, 68)
 
 
 ROOT_OUTDIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/train'
-OUTFILE_NAME = 'instances_fat_train_pose_limited_2018'
+# OUTFILE_NAME = 'instances_fat_train_pose_limited_2018'
+OUTFILE_NAME = 'instances_fat_val_pose_2018'
 
 INFO = {
     "description": "Example Dataset",
