@@ -75,28 +75,33 @@ class PostProcessor(nn.Module):
             proposals = proposals.repeat(1, class_prob.shape[1])
 
         num_classes = class_prob.shape[1]
-
+        num_viewpoints = None
+        num_inplane_rotations = None
+        if self.pose_on:
+            num_viewpoints = viewpoint_prob.shape[1]
+            num_inplane_rotations = inplane_rotation_prob.shape[1]
+        
         proposals = proposals.split(boxes_per_image, dim=0)
         class_prob = class_prob.split(boxes_per_image, dim=0)
+        
         if self.pose_on:
             viewpoint_prob = viewpoint_prob.split(boxes_per_image, dim=0)
             inplane_rotation_prob = inplane_rotation_prob.split(boxes_per_image, dim=0)
 
-
         results = []
         if self.pose_on:
-            for c_prob, boxes_per_img, image_shape in zip(
-                class_prob, proposals, image_shapes
-            ):
-                boxlist = self.prepare_boxlist(boxes_per_img, c_prob, image_shape)
-                boxlist = boxlist.clip_to_image(remove_empty=False)
-                boxlist = self.filter_results(boxlist, num_classes)
-                results.append(boxlist)
-        else:
             for c_prob, v_prob, i_prob, boxes_per_img, image_shape in zip(
                 class_prob, viewpoint_prob, inplane_rotation_prob, proposals, image_shapes
             ):
                 boxlist = self.prepare_boxlist(boxes_per_img, c_prob, image_shape, v_prob, i_prob)
+                boxlist = boxlist.clip_to_image(remove_empty=False)
+                boxlist = self.filter_results(boxlist, num_classes, num_viewpoints, num_inplane_rotations)
+                results.append(boxlist)
+        else:
+            for c_prob, boxes_per_img, image_shape in zip(
+                class_prob, proposals, image_shapes
+            ):
+                boxlist = self.prepare_boxlist(boxes_per_img, c_prob, image_shape)
                 boxlist = boxlist.clip_to_image(remove_empty=False)
                 boxlist = self.filter_results(boxlist, num_classes)
                 results.append(boxlist)
@@ -125,7 +130,7 @@ class PostProcessor(nn.Module):
             boxlist.add_field("inplane_rotation_scores", inplane_rotation_scores)
         return boxlist
 
-    def filter_results(self, boxlist, num_classes):
+    def filter_results(self, boxlist, num_classes, num_viewpoints=None, num_inplane_rotations=None):
         """Returns bounding-box detection results by thresholding on scores and
         applying non-maximum suppression (NMS).
         """
@@ -133,18 +138,35 @@ class PostProcessor(nn.Module):
         # if we had multi-class NMS, we could perform this directly on the boxlist
         boxes = boxlist.bbox.reshape(-1, num_classes * 4)
         scores = boxlist.get_field("scores").reshape(-1, num_classes)
-
+        if num_viewpoints is not None and num_inplane_rotations is not None:
+            viewpoint_scores = boxlist.get_field("viewpoint_scores").reshape(-1, num_viewpoints)
+            inplane_rotation_scores = boxlist.get_field("inplane_rotation_scores").reshape(-1, num_inplane_rotations)
+        
         device = scores.device
         result = []
         # Apply threshold on detection probabilities and apply NMS
         # Skip j = 0, because it's the background class
         inds_all = scores > self.score_thresh
+        # scores is a 2D matrix containing number of boxes in rows and number of classes in columns
+        # same for viewpoints and inplane rotations
+
         for j in range(1, num_classes):
+            # Find boxes for each class and add them to the list
             inds = inds_all[:, j].nonzero().squeeze(1)
             scores_j = scores[inds, j]
             boxes_j = boxes[inds, j * 4 : (j + 1) * 4]
             boxlist_for_class = BoxList(boxes_j, boxlist.size, mode="xyxy")
             boxlist_for_class.add_field("scores", scores_j)
+            if num_viewpoints is not None and num_inplane_rotations is not None:
+                viewpoint_scores_j = viewpoint_scores[inds, :]
+                inplane_rotation_scores_j = inplane_rotation_scores[inds, :]
+                boxlist_for_class.add_field("viewpoint_scores", viewpoint_scores_j)
+                boxlist_for_class.add_field("inplane_rotation_scores", inplane_rotation_scores_j)
+                if viewpoint_scores_j.shape[0] > 0:
+                    viewpoint_labels_j = torch.argmax(viewpoint_scores_j, dim=1)
+                    print(viewpoint_labels_j)
+                if inplane_rotation_scores_j.shape[0] > 0:
+                    inplane_rotation_labels_j = torch.argmax(inplane_rotation_scores_j, dim=1)
             boxlist_for_class = boxlist_nms(
                 boxlist_for_class, self.nms
             )

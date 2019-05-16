@@ -27,6 +27,8 @@ from sphere_fibonacci_grid_points import sphere_fibonacci_grid_points
 from tqdm import tqdm, trange
 from lib.pair_matching import RT_transform
 from dipy.core.geometry import cart2sphere, sphere2cart, sphere_distance
+from lib.render_glumpy.render_py import Render_Py
+from lib.utils.mkdir_if_missing import mkdir_if_missing
 
 ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra'
 IMAGE_DIR_LIST = [
@@ -58,7 +60,7 @@ inplane_rot_angles = np.linspace(-math.pi, math.pi, 68)
 
 
 
-ROOT_OUTDIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/train'
+# ROOT_OUTDIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/train'
 # OUTFILE_NAME = 'instances_fat_train_pose_limited_2018'
 OUTFILE_NAME = 'instances_fat_val_pose_2018'
 
@@ -78,6 +80,37 @@ LICENSES = [
         "url": "http://creativecommons.org/licenses/by-nc-sa/2.0/"
     }
 ]
+LM6d_root = "/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/"
+
+def render_pose(class_name, fixed_transform, camera_intrinsics, rotation_angles, location):
+    width = 960
+    height = 540
+    K = np.array([[camera_intrinsics['fx'], 0, camera_intrinsics['cx']], 
+                  [0, camera_intrinsics['fy'], camera_intrinsics['cy']], 
+                  [0, 0, 1]])
+    # Check these TODO
+    ZNEAR = 0.1
+    ZFAR = 20
+    depth_factor = 1000
+    model_dir = os.path.join(LM6d_root, "models", class_name)
+    render_machine = Render_Py(model_dir, K, width, height, ZNEAR, ZFAR)
+
+    fixed_transform = np.transpose(np.array(fixed_transform))
+    fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
+    object_world_transform = np.zeros((4,4))
+    object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1],rotation_angles[2])
+    object_world_transform[:,3] = [i/100 for i in location] + [1]
+
+    total_transform = np.matmul(object_world_transform, fixed_transform)
+    pose_rendered_q = RT_transform.mat2quat(total_transform[:3,:3]).tolist() + total_transform[:3,3].flatten().tolist()
+    
+    rgb_gl, depth_gl = render_machine.render(
+        pose_rendered_q[:4], np.array(pose_rendered_q[4:])
+    )
+    rgb_gl = rgb_gl.astype("uint8")
+
+    depth_gl = (depth_gl * depth_factor).astype(np.uint16)
+    return rgb_gl, depth_gl
 
 def cart2polar(point):
     r = math.sqrt(point[0]**2 + point[1]**2 + point[2]**2)
@@ -258,6 +291,7 @@ def main():
             if my_file.is_file():
                 with open(label_filename) as file:
                     label_data = json.load(file)
+                    all_objects_yaw_only = True
                     for i in range(0, len(label_data['objects'])):
                         class_name = label_data['objects'][i]['class']
                         class_bounding_box = label_data['objects'][i]['bounding_box']
@@ -266,7 +300,8 @@ def main():
                         angles = RT_transform.quat2euler(get_wxyz_quaternion(quat))
                         # This function gives angles with this convention of euler - https://en.wikipedia.org/wiki/Euler_angles#Signs_and_ranges (geometric definition)
 
-                        
+                        if np.isclose(angles[1], 0):
+                            print("Test")
                         theta, phi = euler2sphere(angles[1], angles[0])
                         actual_angles = np.array([1, theta, phi])
                         xyz_coord = sphere2cart(1, theta, phi)

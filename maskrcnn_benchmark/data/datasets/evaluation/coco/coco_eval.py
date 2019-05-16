@@ -48,6 +48,9 @@ def do_coco_evaluation(
     if 'keypoints' in iou_types:
         logger.info('Preparing keypoints results')
         coco_results['keypoints'] = prepare_for_coco_keypoint(predictions, dataset)
+    if "pose" in iou_types:
+        logger.info('Preparing pose results')
+        coco_results["pose"] = prepare_for_coco_pose(predictions, dataset)
 
     results = COCOResults(*iou_types)
     logger.info("Evaluating predictions")
@@ -66,6 +69,42 @@ def do_coco_evaluation(
         torch.save(results, os.path.join(output_folder, "coco_results.pth"))
     return results, coco_results
 
+def prepare_for_coco_pose(predictions, dataset):
+    # assert isinstance(dataset, COCODataset)
+    coco_results = []
+    for image_id, prediction in enumerate(predictions):
+        original_id = dataset.id_to_img_map[image_id]
+        if len(prediction) == 0:
+            continue
+
+        img_info = dataset.get_img_info(image_id)
+        image_width = img_info["width"]
+        image_height = img_info["height"]
+        prediction = prediction.resize((image_width, image_height))
+        prediction = prediction.convert("xywh")
+
+        boxes = prediction.bbox.tolist()
+        scores = prediction.get_field("scores").tolist()
+        labels = prediction.get_field("labels").tolist()
+        viewpoint_scores = prediction.get_field("viewpoint_scores").tolist()
+        inplane_rotation_scores = prediction.get_field("inplane_rotation_scores").tolist()
+
+        mapped_labels = [dataset.contiguous_category_id_to_json_id[i] for i in labels]
+
+        coco_results.extend(
+            [
+                {
+                    "image_id": original_id,
+                    "category_id": mapped_labels[k],
+                    "bbox": box,
+                    "score": scores[k],
+                    "viewpoint_scores": viewpoint_scores[k],
+                    "inplane_rotation_scores": inplane_rotation_scores[k]
+                }
+                for k, box in enumerate(boxes)
+            ]
+        )
+    return coco_results
 
 def prepare_for_coco_detection(predictions, dataset):
     # assert isinstance(dataset, COCODataset)
@@ -338,10 +377,11 @@ class COCOResults(object):
             "ARl@1000",
         ],
         "keypoints": ["AP", "AP50", "AP75", "APm", "APl"],
+        "pose" : ["AP", "AP50", "AP75", "APm", "APl"]
     }
 
     def __init__(self, *iou_types):
-        allowed_types = ("box_proposal", "bbox", "segm", "keypoints")
+        allowed_types = ("box_proposal", "bbox", "segm", "keypoints", "pose")
         assert all(iou_type in allowed_types for iou_type in iou_types)
         results = OrderedDict()
         for iou_type in iou_types:

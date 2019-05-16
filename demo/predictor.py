@@ -9,12 +9,15 @@ from maskrcnn_benchmark.structures.image_list import to_image_list
 from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark import layers as L
 from maskrcnn_benchmark.utils import cv2_util
+from dipy.core.geometry import cart2sphere, sphere2cart
+import sys
+sys.path.insert(0, "../tools/fat_dataset")
+from convert_fat_coco import *
 
 class COCODemo(object):
     # COCO categories for pretty print
     CATEGORIES = [
         "__background",
-		"jenga_block"
     ]
 
     def __init__(
@@ -24,6 +27,11 @@ class COCODemo(object):
         show_mask_heatmaps=False,
         masks_per_dim=2,
         min_image_size=800,
+        categories=None,
+        viewpoints_xyz=None,
+        inplane_rotations=None,
+        fixed_transforms_dict=None,
+        camera_intrinsics=None
     ):
         self.cfg = cfg.clone()
         self.model = build_detection_model(cfg)
@@ -31,10 +39,15 @@ class COCODemo(object):
         self.device = torch.device(cfg.MODEL.DEVICE)
         self.model.to(self.device)
         self.min_image_size = min_image_size
+        self.CATEGORIES += categories
+        self.viewpoints_xyz = viewpoints_xyz
+        self.inplane_rotations = inplane_rotations
+        self.fixed_transforms_dict = fixed_transforms_dict
+        self.camera_intrinsics = camera_intrinsics
 
         save_dir = cfg.OUTPUT_DIR
         checkpointer = DetectronCheckpointer(cfg, self.model, save_dir=save_dir)
-        print(cfg.MODEL.WEIGHT)
+        print("Using model at : {}".format(cfg.MODEL.WEIGHT))
         _ = checkpointer.load(cfg.MODEL.WEIGHT)
 
         self.transforms = self.build_transform()
@@ -92,19 +105,23 @@ class COCODemo(object):
         """
         predictions = self.compute_prediction(image)
         top_predictions = self.select_top_predictions(predictions)
-
         result = image.copy()
         if self.show_mask_heatmaps:
             return self.create_mask_montage(result, top_predictions)
         # result = self.overlay_boxes(result, top_predictions)
+        
         if self.cfg.MODEL.MASK_ON:
             mask_list = self.get_all_masks(result, top_predictions)
             result = self.overlay_mask(result, top_predictions)
         if self.cfg.MODEL.KEYPOINT_ON:
             result = self.overlay_keypoints(result, top_predictions)
         result = self.overlay_class_names(result, top_predictions)
+        if self.cfg.MODEL.POSE_ON:
+            img_list = self.render_poses(top_predictions)
 
         if self.cfg.MODEL.MASK_ON:
+            if self.cfg.MODEL.POSE_ON:
+                return result, mask_list, img_list
             return result, mask_list
         else:
             return result
@@ -136,7 +153,9 @@ class COCODemo(object):
         # reshape prediction (a BoxList) into the original image size
         height, width = original_image.shape[:-1]
         prediction = prediction.resize((width, height))
-
+        # if prediction.has_field("viewpoint_scores") and prediction.has_field("inplane_rotation_scores"):
+        #     prediction = self.select_top_rotations(prediction)
+            
         if prediction.has_field("mask"):
             # if we have masks, paste the masks in the right position
             # in the image, as defined by the bounding boxes
@@ -146,6 +165,61 @@ class COCODemo(object):
             prediction.add_field("mask", masks)
         return prediction
 
+    def select_top_rotations(self, prediction, use_thresh=False):
+        top_viewpoint_ids = []
+        top_inplane_rotation_ids = []
+
+        viewpoint_scores = prediction.get_field("viewpoint_scores")
+        inplane_rotation_scores = prediction.get_field("inplane_rotation_scores")
+
+        if use_thresh:
+            top_viewpoint_scores = viewpoint_scores > 0.05
+            top_inplane_rotation_scores = inplane_rotation_scores > 0.1
+
+            for i in range(top_viewpoint_scores.shape[0]):
+                top_viewpoint_ids.append(
+                    torch.nonzero(top_viewpoint_scores[i, :]).numpy().flatten().tolist()
+                )
+                top_inplane_rotation_ids.append(
+                    torch.nonzero(top_inplane_rotation_scores[i, :]).numpy().flatten().tolist()
+                )
+        else:
+            top_viewpoint_ids = torch.argmax(viewpoint_scores, dim=1).numpy().tolist()
+            top_inplane_rotation_ids = torch.argmax(inplane_rotation_scores, dim=1).numpy().tolist()
+        
+        # prediction.add_field("viewpoint_ids", top_viewpoint_ids)
+        # prediction.add_field("inplane_rotation_ids", top_inplane_rotation_ids)
+       
+        return top_viewpoint_ids, top_inplane_rotation_ids
+        # return prediction
+
+    def render_poses(self, top_predictions):
+        top_viewpoint_ids, top_inplane_rotation_ids = \
+            self.select_top_rotations(top_predictions, use_thresh=False)
+        labels = top_predictions.get_field("labels").tolist()
+        labels = [self.CATEGORIES[i] for i in labels]
+
+        print(top_viewpoint_ids)
+        print(top_inplane_rotation_ids)
+        print(labels)
+
+        img_list = []
+
+        for i in range(len(top_viewpoint_ids)):
+            viewpoint_id = top_viewpoint_ids[i]
+            inplane_rotation_id = top_inplane_rotation_ids[i]
+            label = labels[i]
+            fixed_transform = self.fixed_transforms_dict[label]
+            viewpoint_xyz = get_viewpoint_from_id(self.viewpoints_xyz, viewpoint_id)
+            r, theta, phi = cart2sphere(viewpoint_xyz[0], viewpoint_xyz[1], viewpoint_xyz[2])
+            theta, phi = sphere2euler(theta, phi)
+            inplane_rotation_angle = get_inplane_rotation_from_id(self.inplane_rotations, inplane_rotation_id)
+            xyz_rotation_angles = [phi, theta, inplane_rotation_angle]
+            print("Recovered rotation : {}".format(xyz_rotation_angles))
+            rgb_gl, depth_gl = render_pose(label, fixed_transform, self.camera_intrinsics, xyz_rotation_angles, [0,0,100])
+            img_list.append([rgb_gl, depth_gl])
+
+        return img_list
     def select_top_predictions(self, predictions):
         """
         Select only predictions which have a `score` > self.confidence_threshold,

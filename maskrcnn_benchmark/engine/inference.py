@@ -17,6 +17,7 @@ def compute_on_dataset(model, data_loader, device, timer=None):
     model.eval()
     results_dict = {}
     cpu_device = torch.device("cpu")
+    count = 0
     for _, batch in enumerate(tqdm(data_loader)):
         images, targets, image_ids = batch
         images = images.to(device)
@@ -31,6 +32,9 @@ def compute_on_dataset(model, data_loader, device, timer=None):
         results_dict.update(
             {img_id: result for img_id, result in zip(image_ids, output)}
         )
+        count += 1
+        if count > 10:
+            break
     return results_dict
 
 
