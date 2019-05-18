@@ -76,7 +76,7 @@ class FPNPredictorWithPose(nn.Module):
         nn.init.normal_(self.viewpoint_score.weight, std=0.01)
         nn.init.normal_(self.inplane_rotation_score.weight, std=0.01)
         nn.init.normal_(self.bbox_pred.weight, std=0.001)
-        for l in [self.cls_score, self.bbox_pred]:
+        for l in [self.cls_score, self.bbox_pred, self.viewpoint_score, self.inplane_rotation_score]:
             nn.init.constant_(l.bias, 0)
 
     def forward(self, x):

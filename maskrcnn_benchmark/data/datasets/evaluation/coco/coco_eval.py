@@ -48,9 +48,9 @@ def do_coco_evaluation(
     if 'keypoints' in iou_types:
         logger.info('Preparing keypoints results')
         coco_results['keypoints'] = prepare_for_coco_keypoint(predictions, dataset)
-    if "pose" in iou_types:
-        logger.info('Preparing pose results')
-        coco_results["pose"] = prepare_for_coco_pose(predictions, dataset)
+    if "pose_viewpoint" in iou_types:
+        logger.info('Preparing pose_viewpoint results')
+        coco_results["pose_viewpoint"] = prepare_for_coco_pose_viewpoint(predictions, dataset)
 
     results = COCOResults(*iou_types)
     logger.info("Evaluating predictions")
@@ -69,7 +69,7 @@ def do_coco_evaluation(
         torch.save(results, os.path.join(output_folder, "coco_results.pth"))
     return results, coco_results
 
-def prepare_for_coco_pose(predictions, dataset):
+def prepare_for_coco_pose_viewpoint(predictions, dataset):
     # assert isinstance(dataset, COCODataset)
     coco_results = []
     for image_id, prediction in enumerate(predictions):
@@ -85,12 +85,14 @@ def prepare_for_coco_pose(predictions, dataset):
 
         boxes = prediction.bbox.tolist()
         scores = prediction.get_field("scores").tolist()
-        labels = prediction.get_field("labels").tolist()
-        viewpoint_scores = prediction.get_field("viewpoint_scores").tolist()
-        inplane_rotation_scores = prediction.get_field("inplane_rotation_scores").tolist()
+        # labels = prediction.get_field("labels").tolist()
+        viewpoint_scores = prediction.get_field("viewpoint_scores")
+        # inplane_rotation_scores = prediction.get_field("inplane_rotation_scores").tolist()
 
-        mapped_labels = [dataset.contiguous_category_id_to_json_id[i] for i in labels]
-
+        # mapped_labels = [dataset.contiguous_category_id_to_json_id[i] for i in labels]
+        mapped_labels = torch.argmax(viewpoint_scores, dim=1).tolist()
+        # viewpoint_scores = viewpoint_scores.tolist()
+        # print("viewpoint : {}".format(viewpoint_scores[0]))
         coco_results.extend(
             [
                 {
@@ -98,12 +100,24 @@ def prepare_for_coco_pose(predictions, dataset):
                     "category_id": mapped_labels[k],
                     "bbox": box,
                     "score": scores[k],
-                    "viewpoint_scores": viewpoint_scores[k],
-                    "inplane_rotation_scores": inplane_rotation_scores[k]
                 }
                 for k, box in enumerate(boxes)
             ]
         )
+
+        # coco_results.extend(
+        #     [
+        #         {
+        #             "image_id": original_id,
+        #             "category_id": mapped_labels[k],
+        #             "bbox": box,
+        #             "score": scores[k],
+        #             "viewpoint_scores": viewpoint_scores[k],
+        #             "inplane_rotation_scores": inplane_rotation_scores[k]
+        #         }
+        #         for k, box in enumerate(boxes)
+        #     ]
+        # )
     return coco_results
 
 def prepare_for_coco_detection(predictions, dataset):
@@ -125,7 +139,7 @@ def prepare_for_coco_detection(predictions, dataset):
         labels = prediction.get_field("labels").tolist()
 
         mapped_labels = [dataset.contiguous_category_id_to_json_id[i] for i in labels]
-
+        # print(len(scores[0]))
         coco_results.extend(
             [
                 {
@@ -377,11 +391,12 @@ class COCOResults(object):
             "ARl@1000",
         ],
         "keypoints": ["AP", "AP50", "AP75", "APm", "APl"],
-        "pose" : ["AP", "AP50", "AP75", "APm", "APl"]
+        "pose_viewpoint" : ["AP", "AP50", "AP75", "APm", "APl"],
+        "pose_inplane_rotation" : ["AP", "AP50", "AP75", "APm", "APl"]
     }
 
     def __init__(self, *iou_types):
-        allowed_types = ("box_proposal", "bbox", "segm", "keypoints", "pose")
+        allowed_types = ("box_proposal", "bbox", "segm", "keypoints", "pose_viewpoint", "pose_inplane_rotation")
         assert all(iou_type in allowed_types for iou_type in iou_types)
         results = OrderedDict()
         for iou_type in iou_types:

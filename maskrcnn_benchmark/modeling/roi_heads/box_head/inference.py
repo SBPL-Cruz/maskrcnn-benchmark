@@ -162,11 +162,14 @@ class PostProcessor(nn.Module):
                 inplane_rotation_scores_j = inplane_rotation_scores[inds, :]
                 boxlist_for_class.add_field("viewpoint_scores", viewpoint_scores_j)
                 boxlist_for_class.add_field("inplane_rotation_scores", inplane_rotation_scores_j)
-                if viewpoint_scores_j.shape[0] > 0:
-                    viewpoint_labels_j = torch.argmax(viewpoint_scores_j, dim=1)
-                    print(viewpoint_labels_j)
-                if inplane_rotation_scores_j.shape[0] > 0:
-                    inplane_rotation_labels_j = torch.argmax(inplane_rotation_scores_j, dim=1)
+                # if viewpoint_scores_j.shape[0] > 0:
+                #     viewpoint_labels_j = torch.argmax(viewpoint_scores_j, dim=1)
+                #     boxlist_for_class.add_field("viewpoint_labels", viewpoint_labels_j)
+                #     # print(viewpoint_labels_j)
+                # if inplane_rotation_scores_j.shape[0] > 0:
+                #     inplane_rotation_labels_j = torch.argmax(inplane_rotation_scores_j, dim=1)
+                #     boxlist_for_class.add_field("inplane_rotation_labels", inplane_rotation_labels_j)
+                #     # print(inplane_rotation_labels_j)
             boxlist_for_class = boxlist_nms(
                 boxlist_for_class, self.nms
             )
