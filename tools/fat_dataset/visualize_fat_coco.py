@@ -31,18 +31,20 @@ def render_pose(rendered_dir, count, class_name, fixed_transforms_dict, camera_i
     depth_factor = 1000
     model_dir = os.path.join(LM6d_root, "models", class_name)
     # model_dir = os.path.join(LM6d_root, "aligned_cm", class_name, "google_16k")
-    render_machine = Render_Py(model_dir, K, width, height, ZNEAR, ZFAR)
+    
 
-    # camera_pose_matrix = np.zeros((4,4))
-    # camera_pose_matrix[:, 3] = [i/100 for i in camera_pose['location_worldframe']] + [1]
-    # camera_pose_matrix[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
-    # camera_pose_matrix[3,:3] = [0,0,0]
+    camera_pose_matrix = np.zeros((4,4))
+    camera_pose_matrix[:, 3] = [i/100 for i in camera_pose['location_worldframe']] + [1]
+    camera_pose_matrix[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
+    camera_pose_matrix[3,:3] = [0,0,0]
     # print(camera_pose_matrix)
+
 
     fixed_transform = np.transpose(np.array(fixed_transforms_dict[class_name]))
     fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
     object_world_transform = np.zeros((4,4))
     object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1],rotation_angles[2])
+    
     # object_world_transform[:3,:3] = RT_transform.euler2mat(0,0,0)
     # object_world_transform[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(rotation))
     object_world_transform[:,3] = [i/100 for i in location] + [1]
@@ -50,7 +52,13 @@ def render_pose(rendered_dir, count, class_name, fixed_transforms_dict, camera_i
     # print(fixed_transform)
     # total_transform = np.matmul(np.linalg.inv(camera_pose_matrix), object_world_transform)
     # fixed_transform = np.matmul(m, fixed_transform)
+
     total_transform = np.matmul(object_world_transform, fixed_transform)
+
+    object_world_transform = np.matmul(np.linalg.inv(camera_pose_matrix), total_transform)
+    print(RT_transform.mat2euler(object_world_transform[:3,:3]))
+    
+    render_machine = Render_Py(model_dir, K, width, height, ZNEAR, ZFAR)
     pose_rendered_q = RT_transform.mat2quat(total_transform[:3,:3]).tolist() + total_transform[:3,3].flatten().tolist()
     # pose_rendered_q = RT_transform.mat2quat(object_world_transform[:3,:3]).tolist() + object_world_transform[:3,3].flatten().tolist()
     # print(pose_rendered_q)
@@ -75,7 +83,7 @@ def render_pose(rendered_dir, count, class_name, fixed_transforms_dict, camera_i
 
 
 image_directory = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/'
-annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_limited_2018.json'
+annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_val_pose_2018.json'
 
 example_coco = COCO(annotation_file)
 camera_intrinsics = example_coco.dataset['camera_intrinsic_settings']
@@ -94,7 +102,7 @@ category_ids = example_coco.getCatIds(catNms=['square'])
 image_ids = example_coco.getImgIds(catIds=category_ids)
 # image_data = example_coco.loadImgs(image_ids[np.random.randint(0, len(image_ids))])[0]
 # image_data = example_coco.loadImgs(image_ids[8])[0]
-image_data = example_coco.loadImgs(image_ids[1995])[0]
+image_data = example_coco.loadImgs(image_ids[421])[0]
 
 print(image_data)
 directory = './output'
@@ -102,7 +110,7 @@ if not os.path.exists(directory):
     os.makedirs(directory)
 else:
     shutil.rmtree(directory, ignore_errors=True)
-    # os.makedirs(directory)
+    os.makedirs(directory)
 
 plt.figure()
 image = io.imread(image_directory + image_data['file_name'])
@@ -116,6 +124,7 @@ pylab.rcParams['figure.figsize'] = (8.0, 10.0)
 annotation_ids = example_coco.getAnnIds(imgIds=image_data['id'], catIds=category_ids, iscrowd=None)
 annotations = example_coco.loadAnns(annotation_ids)
 example_coco.showAnns(annotations)
+plt.show()
 # print(annotations)
 
 

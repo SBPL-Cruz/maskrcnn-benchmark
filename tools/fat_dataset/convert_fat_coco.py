@@ -33,7 +33,7 @@ from lib.utils.mkdir_if_missing import mkdir_if_missing
 ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra'
 IMAGE_DIR_LIST = [
         os.path.join(ROOT_DIR, "kitchen_0"), 
-        os.path.join(ROOT_DIR, "kitchen_1"),
+        # os.path.join(ROOT_DIR, "kitchen_1"),
         # os.path.join(ROOT_DIR, "kitchen_2"),
         # os.path.join(ROOT_DIR, "kitchen_3"),
         # os.path.join(ROOT_DIR, "kitchen_4"),
@@ -62,7 +62,8 @@ inplane_rot_angles = np.linspace(-math.pi, math.pi, 68)
 
 # ROOT_OUTDIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/train'
 # OUTFILE_NAME = 'instances_fat_train_pose_limited_2018'
-OUTFILE_NAME = 'instances_fat_val_pose_2018'
+# OUTFILE_NAME = 'instances_fat_val_pose_2018'
+OUTFILE_NAME = 'instances_perch_pose_2018'
 
 INFO = {
     "description": "Example Dataset",
@@ -203,6 +204,29 @@ def sphere2euler(theta, phi):
     #     phi += 2*math.pi
     return theta, phi
 
+def get_object_world_pose(camera_pose, rotation_angles, FIXED_TRANSFORMS, class_name, location):
+    class_name = class_name.replace('_16k', '').replace('_16K', '')
+    camera_pose_matrix = np.zeros((4,4))
+    camera_pose_matrix[:, 3] = [i/100 for i in camera_pose['location_worldframe']] + [1]
+    camera_pose_matrix[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
+
+    fixed_transform = np.transpose(np.array(FIXED_TRANSFORMS[class_name]))
+    fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
+    object_world_transform = np.zeros((4,4))
+    object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1],rotation_angles[2])
+
+    # object_world_transform[:3,:3] = RT_transform.euler2mat(0,0,0)
+    # object_world_transform[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(rotation))
+    object_world_transform[:,3] = [i/100 for i in location] + [1]
+
+    # object_world_pose = np.linalg.inv(camera_pose_matrix) @ object_world_transform
+    # object_world_pose = object_world_transform @ np.linalg.inv(camera_pose_matrix)
+    # object_world_pose = np.linalg.inv(camera_pose_matrix) @ object_world_transform @ fixed_transform
+    object_world_pose = camera_pose_matrix @ object_world_transform
+    # object_world_pose = object_world_transform @ fixed_transform
+    # print(object_world_pose[:,3])
+    return (RT_transform.mat2euler(object_world_pose[:3,:3]))
+
 def main():
 
 
@@ -296,16 +320,30 @@ def main():
                         class_name = label_data['objects'][i]['class']
                         class_bounding_box = label_data['objects'][i]['bounding_box']
                         quat = label_data['objects'][i]['quaternion_xyzw']
-                        
-                        angles = RT_transform.quat2euler(get_wxyz_quaternion(quat))
-                        # This function gives angles with this convention of euler - https://en.wikipedia.org/wiki/Euler_angles#Signs_and_ranges (geometric definition)
+                        location = label_data['objects'][i]['location']
+                        camera_pose = label_data['camera_data']
 
-                        if np.isclose(angles[1], 0):
+                        angles = RT_transform.quat2euler(get_wxyz_quaternion(quat))
+                        # This function gives angles with this convention of euler - https://en.wikipedia.org/wiki/Euler_angles (geometric definition)
+                        # print("{}, angles : {}".format(class_name, angles))
+                        world_angles = get_object_world_pose(camera_pose, angles, FIXED_TRANSFORMS, class_name, location)
+                        # print(class_name)
+                        # plt.figure()
+                        # skimage.io.imshow(skimage.io.imread(image_filename))
+                        # plt.show()
+                        if (abs(world_angles[1]) < 0.01 and abs(world_angles[2]) < 0.01) or \
+                            (abs(world_angles[0]) < 0.01 and abs(world_angles[1]) < 0.01) or \
+                            (abs(world_angles[0]) < 0.01 and abs(world_angles[2]) < 0.01):
+                            print("{} : {} : {} ".format(image_filename, class_name, world_angles))
                             print("Test")
+                            plt.figure()
+                            skimage.io.imshow(skimage.io.imread(image_filename))
+                            plt.show()
+                            # plt.show()
+                        #phsyics convention
                         theta, phi = euler2sphere(angles[1], angles[0])
                         actual_angles = np.array([1, theta, phi])
                         xyz_coord = sphere2cart(1, theta, phi)
-                        
                         viewpoint_id = find_viewpoint_id(viewpoints_xyz, xyz_coord)
                         r_xyz = get_viewpoint_from_id(viewpoints_xyz, viewpoint_id)
                         recovered_angles = np.array(cart2sphere(r_xyz[0], r_xyz[1], r_xyz[2]))
@@ -351,8 +389,8 @@ def main():
                         if annotation_info is not None:
                             annotation_info['viewpoint_id'] = int(viewpoint_id)
                             annotation_info['inplane_rotation_id'] = int(inplane_rotation_id)
-                            annotation_info['camera_pose'] = label_data['camera_data']
-                            annotation_info['location'] = label_data['objects'][i]['location']
+                            annotation_info['camera_pose'] = camera_pose
+                            annotation_info['location'] = location
                             annotation_info['quaternion_xyzw'] = quat
                             coco_output["annotations"].append(annotation_info)
                             coco_output["images"].append(image_info)
@@ -362,7 +400,7 @@ def main():
             else:
                 tqdm.write("File %s doesn't have a label file" % image_filename)
                     
-
+            # plt.show()
             image_global_id = image_global_id + 1
 
         with open('{}/{}.json'.format(ROOT_DIR, OUTFILE_NAME), 'w') as output_json_file:
