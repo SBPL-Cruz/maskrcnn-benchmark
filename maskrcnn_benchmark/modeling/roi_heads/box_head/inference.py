@@ -56,10 +56,11 @@ class PostProcessor(nn.Module):
         """
         class_logits, box_regression, viewpoint_logits, inplane_rotation_logits = x
         class_prob = F.softmax(class_logits, -1)
-
         if self.pose_on:
-            viewpoint_prob = F.softmax(viewpoint_logits, -1)
-            inplane_rotation_prob = F.softmax(inplane_rotation_logits, -1)
+            # print(viewpoint_logits.shape)
+            viewpoint_prob = F.softmax(viewpoint_logits, dim=1)
+            inplane_rotation_prob = F.softmax(inplane_rotation_logits, dim=1)
+            # print(torch.argmax(viewpoint_prob, dim=1))
 
         # TODO think about a representation of batch of boxes
         image_shapes = [box.size for box in boxes]

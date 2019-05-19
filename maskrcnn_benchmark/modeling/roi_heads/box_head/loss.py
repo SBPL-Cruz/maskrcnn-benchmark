@@ -81,14 +81,14 @@ class FastRCNNLossComputation(object):
             ignore_inds = matched_idxs == Matcher.BETWEEN_THRESHOLDS
             labels_per_image[ignore_inds] = -1  # -1 is ignored by sampler
 
-            if matched_targets.has_field('viewpoints') \
-                and matched_targets.has_field('inplane_rotations'):
-                viewpoints_per_image[bg_inds] = 0
-                viewpoints_per_image[ignore_inds] = -1
-                viewpoints.append(viewpoints_per_image)
-                inplane_rotations_per_image[bg_inds] = 0
-                inplane_rotations_per_image[ignore_inds] = -1
-                inplane_rotations.append(inplane_rotations_per_image)
+            # if matched_targets.has_field('viewpoints') \
+            #     and matched_targets.has_field('inplane_rotations'):
+            #     viewpoints_per_image[bg_inds] = 0
+            #     viewpoints_per_image[ignore_inds] = -1
+            viewpoints.append(viewpoints_per_image)
+            #     inplane_rotations_per_image[bg_inds] = 0
+            #     inplane_rotations_per_image[ignore_inds] = -1
+            inplane_rotations.append(inplane_rotations_per_image)
 
 
             # compute regression targets
@@ -196,6 +196,10 @@ class FastRCNNLossComputation(object):
             viewpoints = cat([proposal.get_field("viewpoints") for proposal in proposals], dim=0)
             inplane_rotations = cat([proposal.get_field("inplane_rotations") for proposal in proposals], dim=0)
             
+            # print(viewpoints)
+            # viewpoint_prob = F.softmax(viewpoint_logits, dim=1)
+            # print(torch.argmax(viewpoint_prob, dim=1))
+
             viewpoint_loss = F.cross_entropy(viewpoint_logits, viewpoints)
             inplane_rotation_loss = F.cross_entropy(inplane_rotation_logits, inplane_rotations)
 

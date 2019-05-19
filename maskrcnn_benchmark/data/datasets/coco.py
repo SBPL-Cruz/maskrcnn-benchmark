@@ -95,7 +95,7 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
         if anno and "inplane_rotation_id" in anno[0]:
             inplane_rotation_id = [obj["inplane_rotation_id"] for obj in anno]
             target.add_field("inplane_rotations", torch.tensor(inplane_rotation_id))
-        # print(inplane_rotation_id)
+        # print(viewpoint_id)
 
         target = target.clip_to_image(remove_empty=True)
 

@@ -36,7 +36,7 @@ print(all_predictions[:5])
 category_ids = example_coco.getCatIds(catNms=['square'])
 image_ids = example_coco.getImgIds(catIds=category_ids)
 # image_data = example_coco.loadImgs(image_ids[np.random.randint(0, len(image_ids))])[0]
-image_data = example_coco.loadImgs(image_ids[0])[0]
+image_data = example_coco.loadImgs(image_ids[100])[0]
 viewpoints_xyz = np.array(example_coco.dataset['viewpoints'])
 inplane_rotations = np.array(example_coco.dataset['inplane_rotations'])
 fixed_transforms_dict = example_coco.dataset['fixed_transforms']
@@ -44,10 +44,10 @@ camera_intrinsics = example_coco.dataset['camera_intrinsic_settings']
 
 print(image_data)
 
-plt.figure()
+# plt.figure()
 img_path = os.path.join(image_directory, image_data['file_name'])
 image = io.imread(img_path)
-plt.imshow(image); plt.axis('off')
+# plt.imshow(image); plt.axis('off')
 
 # # Running model on image
 
@@ -77,20 +77,32 @@ coco_demo = COCODemo(
     camera_intrinsics = camera_intrinsics
 )
 
-
+from mpl_toolkits.axes_grid1 import ImageGrid
 import cv2
 img = cv2.imread(img_path)
 composite, result, img_list = coco_demo.run_on_opencv_image(img)
-plt.figure()
-plt.imshow(composite); plt.axis('off')
-cv2.imwrite('composite.png', composite)
+fig = plt.figure(1, (4., 4.))
+grid = ImageGrid(fig, 111,  
+                 nrows_ncols=(1, len(img_list)+1),
+                 axes_pad=0.1, 
+                 )
+
+# plt.imshow(composite); plt.axis('off')
+# cv2.imwrite('composite.png', composite)
+grid[0].imshow(cv2.cvtColor(composite, cv2.COLOR_BGR2RGB))
+grid[0].axis("off")
 
 for i in range(len(img_list)):
     image_file = os.path.join(
         "{}-color.png".format(i),
     )
     rgb_gl = img_list[i][0]
-    cv2.imwrite(image_file, rgb_gl)
+    # cv2.imwrite(image_file, rgb_gl)
+    grid[i+1].imshow(cv2.cvtColor(rgb_gl, cv2.COLOR_BGR2RGB))
+    grid[i+1].axis("off")
+
+plt.savefig('output.png')
+plt.show()
     # print(i[0])
 
 
