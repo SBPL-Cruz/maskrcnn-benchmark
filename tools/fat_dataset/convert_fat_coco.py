@@ -155,6 +155,12 @@ def filter_for_labels(root, files, image_filename):
 
     return files
 
+def get_viewpoint_rotations_from_id(viewpoints_xyz, viewpoint_id):
+    viewpoint_xyz = get_viewpoint_from_id(viewpoints_xyz, viewpoint_id)
+    r, theta, phi = cart2sphere(viewpoint_xyz[0], viewpoint_xyz[1], viewpoint_xyz[2])
+    theta, phi = sphere2euler(theta, phi)
+    return theta, phi
+
 def get_viewpoint_from_id(viewpoints_xyz, id):
     return viewpoints_xyz[id, :]
 

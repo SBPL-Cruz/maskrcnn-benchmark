@@ -199,8 +199,8 @@ class COCODemo(object):
         labels = top_predictions.get_field("labels").tolist()
         labels = [self.CATEGORIES[i] for i in labels]
 
-        print(top_viewpoint_ids)
-        print(top_inplane_rotation_ids)
+        print("Predicted top_viewpoint_ids : {}".format(top_viewpoint_ids))
+        print("Predicted top_inplane_rotation_ids : {}".format(top_inplane_rotation_ids))
         print(labels)
 
         img_list = []
@@ -210,9 +210,7 @@ class COCODemo(object):
             inplane_rotation_id = top_inplane_rotation_ids[i]
             label = labels[i]
             fixed_transform = self.fixed_transforms_dict[label]
-            viewpoint_xyz = get_viewpoint_from_id(self.viewpoints_xyz, viewpoint_id)
-            r, theta, phi = cart2sphere(viewpoint_xyz[0], viewpoint_xyz[1], viewpoint_xyz[2])
-            theta, phi = sphere2euler(theta, phi)
+            theta, phi = get_viewpoint_rotations_from_id(self.viewpoints_xyz, viewpoint_id)
             inplane_rotation_angle = get_inplane_rotation_from_id(self.inplane_rotations, inplane_rotation_id)
             xyz_rotation_angles = [phi, theta, inplane_rotation_angle]
             print("Recovered rotation : {}".format(xyz_rotation_angles))
