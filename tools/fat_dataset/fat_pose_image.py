@@ -200,37 +200,67 @@ class FATImage:
             masks_per_dim=args['masks_per_dim'],
             min_image_size=args['min_image_size'],
             categories = self.category_names,
-            viewpoints_xyz = self.viewpoints_xyz,
-            inplane_rotations = self.inplane_rotations,
-            fixed_transforms_dict = self.fixed_transforms_dict,
-            camera_intrinsics = self.camera_intrinsics
+            # viewpoints_xyz = self.viewpoints_xyz,
+            # inplane_rotations = self.inplane_rotations,
+            # fixed_transforms_dict = self.fixed_transforms_dict,
+            # camera_intrinsics = self.camera_intrinsics
         )
 
         
         img = cv2.imread(img_path)
-        composite, result, img_list = coco_demo.run_on_opencv_image(img)
-        fig = plt.figure(1, (8., 8.), dpi=6000)
-        plt.axis("off")
-        grid = ImageGrid(fig, 111,  
-                        nrows_ncols=(1, len(img_list)+1),
-                        axes_pad=0.1, 
-                        )
+        # composite, result, img_list = coco_demo.run_on_opencv_image(img)
+        composite, result, rotation_list = coco_demo.run_on_opencv_image(img)
+        # print(rotation_list)
+        
 
         # plt.imshow(composite); plt.axis('off')
         # cv2.imwrite('composite.png', composite)
+        
+        top_viewpoint_ids = rotation_list['top_viewpoint_ids']
+        top_inplane_rotation_ids = rotation_list['top_inplane_rotation_ids']
+        labels = rotation_list['labels']
+
+        fig = plt.figure(1, (8., 8.), dpi=6000)
+        plt.axis("off")
+        grid = ImageGrid(fig, 111,  
+                        nrows_ncols=(1, len(top_viewpoint_ids)+1),
+                        axes_pad=0.1, 
+                        )
         grid[0].imshow(cv2.cvtColor(composite, cv2.COLOR_BGR2RGB))
         grid[0].axis("off")
 
-        for i in range(len(img_list)):
-            # image_file = os.path.join(
-            #     "{}-color.png".format(i),
-            # )
-            rgb_gl = img_list[i][0]
-            # cv2.imwrite(image_file, rgb_gl)
+        print("Predicted top_viewpoint_ids : {}".format(top_viewpoint_ids))
+        print("Predicted top_inplane_rotation_ids : {}".format(top_inplane_rotation_ids))
+        print(labels)
+
+        img_list = []
+
+        for i in range(len(top_viewpoint_ids)):
+            viewpoint_id = top_viewpoint_ids[i]
+            inplane_rotation_id = top_inplane_rotation_ids[i]
+            label = labels[i]
+            fixed_transform = self.fixed_transforms_dict[label]
+            theta, phi = get_viewpoint_rotations_from_id(self.viewpoints_xyz, viewpoint_id)
+            inplane_rotation_angle = get_inplane_rotation_from_id(self.inplane_rotations, inplane_rotation_id)
+            xyz_rotation_angles = [phi, theta, inplane_rotation_angle]
+            print("Recovered rotation : {}".format(xyz_rotation_angles))
+            rgb_gl, depth_gl = render_pose(
+                label, fixed_transform, self.camera_intrinsics, xyz_rotation_angles, [0,0,100]
+            )
             grid[i+1].imshow(cv2.cvtColor(rgb_gl, cv2.COLOR_BGR2RGB))
             grid[i+1].axis("off")
 
-        plt.savefig('model_output.eps', format='eps', dpi=6000)
+        # for i in range(len(rotation_list)):
+        #     # image_file = os.path.join(
+        #     #     "{}-color.png".format(i),
+        #     # )
+        #     rgb_gl = img_list[i][0]
+        #     # cv2.imwrite(image_file, rgb_gl)
+        #     grid[i+1].imshow(cv2.cvtColor(rgb_gl, cv2.COLOR_BGR2RGB))
+        #     grid[i+1].axis("off")
+
+        # plt.savefig('model_output.eps', format='eps', dpi=6000)
+        plt.savefig('model_output.png', dpi=1000)
         plt.show()
 
 if __name__ == '__main__':

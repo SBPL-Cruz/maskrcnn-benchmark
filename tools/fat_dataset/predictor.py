@@ -28,10 +28,10 @@ class COCODemo(object):
         masks_per_dim=2,
         min_image_size=800,
         categories=None,
-        viewpoints_xyz=None,
-        inplane_rotations=None,
-        fixed_transforms_dict=None,
-        camera_intrinsics=None
+        # viewpoints_xyz=None,
+        # inplane_rotations=None,
+        # fixed_transforms_dict=None,
+        # camera_intrinsics=None
     ):
         self.cfg = cfg.clone()
         self.model = build_detection_model(cfg)
@@ -40,10 +40,10 @@ class COCODemo(object):
         self.model.to(self.device)
         self.min_image_size = min_image_size
         self.CATEGORIES += categories
-        self.viewpoints_xyz = viewpoints_xyz
-        self.inplane_rotations = inplane_rotations
-        self.fixed_transforms_dict = fixed_transforms_dict
-        self.camera_intrinsics = camera_intrinsics
+        # self.viewpoints_xyz = viewpoints_xyz
+        # self.inplane_rotations = inplane_rotations
+        # self.fixed_transforms_dict = fixed_transforms_dict
+        # self.camera_intrinsics = camera_intrinsics
 
         save_dir = cfg.OUTPUT_DIR
         checkpointer = DetectronCheckpointer(cfg, self.model, save_dir=save_dir)
@@ -117,14 +117,27 @@ class COCODemo(object):
             result = self.overlay_keypoints(result, top_predictions)
         result = self.overlay_class_names(result, top_predictions)
         if self.cfg.MODEL.POSE_ON:
-            img_list = self.render_poses(top_predictions)
+            # img_list = self.render_poses(top_predictions)
+            rotation_list = self.get_all_rotations(top_predictions)
 
         if self.cfg.MODEL.MASK_ON:
             if self.cfg.MODEL.POSE_ON:
-                return result, mask_list, img_list
+                return result, mask_list, rotation_list
             return result, mask_list
         else:
             return result
+
+    def get_all_rotations(self, top_predictions):
+        top_viewpoint_ids, top_inplane_rotation_ids = \
+            self.select_top_rotations(top_predictions, use_thresh=False)
+        labels = top_predictions.get_field("labels").tolist()
+        labels = [self.CATEGORIES[i] for i in labels]
+        rotations = {}
+        rotations['top_viewpoint_ids'] = top_viewpoint_ids
+        rotations['top_inplane_rotation_ids'] = top_inplane_rotation_ids
+        rotations['labels'] = labels
+
+        return rotations
 
     def compute_prediction(self, original_image):
         """
@@ -193,31 +206,31 @@ class COCODemo(object):
         return top_viewpoint_ids, top_inplane_rotation_ids
         # return prediction
 
-    def render_poses(self, top_predictions):
-        top_viewpoint_ids, top_inplane_rotation_ids = \
-            self.select_top_rotations(top_predictions, use_thresh=False)
-        labels = top_predictions.get_field("labels").tolist()
-        labels = [self.CATEGORIES[i] for i in labels]
+    # def render_poses(self, top_predictions):
+    #     top_viewpoint_ids, top_inplane_rotation_ids = \
+    #         self.select_top_rotations(top_predictions, use_thresh=False)
+    #     labels = top_predictions.get_field("labels").tolist()
+    #     labels = [self.CATEGORIES[i] for i in labels]
 
-        print("Predicted top_viewpoint_ids : {}".format(top_viewpoint_ids))
-        print("Predicted top_inplane_rotation_ids : {}".format(top_inplane_rotation_ids))
-        print(labels)
+    #     print("Predicted top_viewpoint_ids : {}".format(top_viewpoint_ids))
+    #     print("Predicted top_inplane_rotation_ids : {}".format(top_inplane_rotation_ids))
+    #     print(labels)
 
-        img_list = []
+    #     img_list = []
 
-        for i in range(len(top_viewpoint_ids)):
-            viewpoint_id = top_viewpoint_ids[i]
-            inplane_rotation_id = top_inplane_rotation_ids[i]
-            label = labels[i]
-            fixed_transform = self.fixed_transforms_dict[label]
-            theta, phi = get_viewpoint_rotations_from_id(self.viewpoints_xyz, viewpoint_id)
-            inplane_rotation_angle = get_inplane_rotation_from_id(self.inplane_rotations, inplane_rotation_id)
-            xyz_rotation_angles = [phi, theta, inplane_rotation_angle]
-            print("Recovered rotation : {}".format(xyz_rotation_angles))
-            rgb_gl, depth_gl = render_pose(label, fixed_transform, self.camera_intrinsics, xyz_rotation_angles, [0,0,100])
-            img_list.append([rgb_gl, depth_gl])
+    #     for i in range(len(top_viewpoint_ids)):
+    #         viewpoint_id = top_viewpoint_ids[i]
+    #         inplane_rotation_id = top_inplane_rotation_ids[i]
+    #         label = labels[i]
+    #         fixed_transform = self.fixed_transforms_dict[label]
+    #         theta, phi = get_viewpoint_rotations_from_id(self.viewpoints_xyz, viewpoint_id)
+    #         inplane_rotation_angle = get_inplane_rotation_from_id(self.inplane_rotations, inplane_rotation_id)
+    #         xyz_rotation_angles = [phi, theta, inplane_rotation_angle]
+    #         print("Recovered rotation : {}".format(xyz_rotation_angles))
+    #         rgb_gl, depth_gl = render_pose(label, fixed_transform, self.camera_intrinsics, xyz_rotation_angles, [0,0,100])
+    #         img_list.append([rgb_gl, depth_gl])
 
-        return img_list
+    #     return img_list
     def select_top_predictions(self, predictions):
         """
         Select only predictions which have a `score` > self.confidence_threshold,
