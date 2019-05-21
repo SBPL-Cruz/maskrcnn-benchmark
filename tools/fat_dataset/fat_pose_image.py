@@ -6,8 +6,7 @@ import numpy as np
 import torch
 import json
 import sys
-if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
-    sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+
 
 
 from maskrcnn_benchmark.config import cfg
@@ -17,14 +16,13 @@ import pylab
 from dipy.core.geometry import cart2sphere, sphere2cart
 from convert_fat_coco import *
 from mpl_toolkits.axes_grid1 import ImageGrid
-import cv2
 
-# coco_predictions = torch.load('/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/inference/fat_pose_2018_val_cocostyle/coco_results.pth')
-# all_predictions = torch.load('/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/inference/fat_pose_2018_val_cocostyle/predictions.pth')
+
+
 
 class FATImage:
     def __init__(self, coco_annotation_file=None, coco_image_directory=None):
-        self.image_directory = image_directory
+        self.coco_image_directory = coco_image_directory
         self.example_coco = COCO(coco_annotation_file)
         example_coco = self.example_coco
         self.categories = example_coco.loadCats(example_coco.getCatIds())
@@ -45,8 +43,8 @@ class FATImage:
         self.camera_intrinsics = example_coco.dataset['camera_intrinsic_settings']
 
     def get_random_image(self):
-        # image_data = example_coco.loadImgs(self.image_ids[np.random.randint(0, len(self.image_ids))])[0]
-        image_data = self.example_coco.loadImgs(self.image_ids[100])[0]
+        # image_data = self.example_coco.loadImgs(self.image_ids[np.random.randint(0, len(self.image_ids))])[0]
+        image_data = self.example_coco.loadImgs(self.image_ids[22])[0]
         # print(image_data)
         annotation_ids = self.example_coco.getAnnIds(imgIds=image_data['id'], catIds=self.category_ids, iscrowd=None)
         annotations = self.example_coco.loadAnns(annotation_ids)
@@ -56,10 +54,13 @@ class FATImage:
         return image_data, annotations
     
     def visualize_image_annotations(self, image_data, annotations):
-        img_path = os.path.join(self.image_directory, image_data['file_name'])
+        if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
+            sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+        import cv2
+        img_path = os.path.join(self.coco_image_directory, image_data['file_name'])
         image = io.imread(img_path)
         count = 1
-        fig = plt.figure(2, (4., 4.))
+        fig = plt.figure(2, (4., 4.), dpi=1000)
         plt.axis("off")
         grid = ImageGrid(fig, 111,  
                         nrows_ncols=(1, len(annotations)+1),
@@ -91,6 +92,83 @@ class FATImage:
             count += 1
         plt.savefig('image_annotations_output.png')
 
+    def get_ros_pose(self, location, quat):
+        from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Quaternion
+        p = Pose()
+        p.position.x, p.position.y, p.position.z = [i/100 for i in location]
+        p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w = quat[0], quat[1], quat[2], quat[3]
+        return p
+
+    def visualize_pose_ros(self, image_data, annotations, frame='camera'):
+        print("ROS visualizing")
+        if '/opt/ros/kinetic/lib/python2.7/dist-packages' not in sys.path:
+            sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+        import rospy
+        import rospkg
+        import rosparam
+        from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Quaternion
+        from sensor_msgs.msg import Image
+        from cv_bridge import CvBridge, CvBridgeError
+
+        rospy.init_node('fat_pose')
+        self.ros_rate = rospy.Rate(5)
+        self.objects_pose_pub = rospy.Publisher('fat_image/objects_pose', PoseArray, queue_size=1, latch=True)
+        self.camera_pose_pub = rospy.Publisher('fat_image/camera_pose', PoseStamped, queue_size=1, latch=True)
+        self.scene_image_pub = rospy.Publisher("fat_image/scene_image", Image)
+        self.bridge = CvBridge()
+        import cv2
+            
+        img_path = os.path.join(self.coco_image_directory, image_data['file_name'])
+        # cv_scene_image = cv2.imread(img_path)
+        # cv2.imshow(cv_scene_image)
+        # image = io.imread(img_path)
+        # plt.imshow(image); plt.axis('off')
+        # plt.show()
+
+        object_pose_msg = PoseArray()
+        object_pose_msg.header.frame_id = frame
+        object_pose_msg.header.stamp = rospy.Time.now()
+
+        camera_pose_msg = PoseStamped()
+        camera_pose_msg.header.frame_id = frame
+        camera_pose_msg.header.stamp = rospy.Time.now()
+
+        fat_world_to_world = {}
+        fat_world_to_world['location'] = [0,0,0]
+        # fat_world_to_world['quaternion_xyzw'] = [-0.658, 0.259, 0.259, 0.658]
+        fat_world_to_world['quaternion_xyzw'] = [0.707, 0, 0, -0.707]
+
+        while not rospy.is_shutdown():
+            for annotation in annotations:
+                class_name = self.categories[annotation['category_id']]['name']
+
+                if frame == 'camera':
+                    location, quat = annotation['location'], annotation['quaternion_xyzw']
+
+                if frame == 'fat_world':
+                    location, quat = get_object_pose_in_world(annotation, annotation['camera_pose'])
+                    camera_location, camera_quat = get_camera_pose_in_world(annotation['camera_pose'])      
+
+                if frame == 'world':
+                    location, quat = get_object_pose_in_world(annotation, annotation['camera_pose'], fat_world_to_world)
+                    camera_location, camera_quat = get_camera_pose_in_world(annotation['camera_pose'], fat_world_to_world)      
+
+                object_pose_msg.poses.append(self.get_ros_pose(location, quat))
+
+                if frame != 'camera':
+                    camera_pose_msg.pose = self.get_ros_pose(camera_location, camera_quat)
+                    self.camera_pose_pub.publish(camera_pose_msg)
+
+                print("Rotation for {} : {}".format(class_name, RT_transform.quat2euler(get_xyzw_quaternion(quat))))
+                    
+                # print(location, quat)
+                # try:
+                #     self.scene_image_pub.publish(self.bridge.cv2_to_imgmsg(cv_scene_image, "bgr8"))
+                # except CvBridgeError as e:
+                #     print(e)
+            self.objects_pose_pub.publish(object_pose_msg)
+            self.ros_rate.sleep()
+
     def visualize_model_output(self, image_data):
         # plt.figure()
         img_path = os.path.join(image_directory, image_data['file_name'])
@@ -100,6 +178,10 @@ class FATImage:
         # # Running model on image
 
         from predictor import COCODemo
+        if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
+            sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+        import cv2
+
         cfg_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/configs/fat_pose/e2e_mask_rcnn_R_50_FPN_1x_test_cocostyle.yaml'
         args = {
             'config_file' : cfg_file,
@@ -127,7 +209,7 @@ class FATImage:
         
         img = cv2.imread(img_path)
         composite, result, img_list = coco_demo.run_on_opencv_image(img)
-        fig = plt.figure(1, (4., 4.))
+        fig = plt.figure(1, (8., 8.), dpi=6000)
         plt.axis("off")
         grid = ImageGrid(fig, 111,  
                         nrows_ncols=(1, len(img_list)+1),
@@ -140,54 +222,30 @@ class FATImage:
         grid[0].axis("off")
 
         for i in range(len(img_list)):
-            image_file = os.path.join(
-                "{}-color.png".format(i),
-            )
+            # image_file = os.path.join(
+            #     "{}-color.png".format(i),
+            # )
             rgb_gl = img_list[i][0]
             # cv2.imwrite(image_file, rgb_gl)
             grid[i+1].imshow(cv2.cvtColor(rgb_gl, cv2.COLOR_BGR2RGB))
             grid[i+1].axis("off")
 
-        plt.savefig('model_output.png')
-    # plt.show()
-    # print(i[0])
+        plt.savefig('model_output.eps', format='eps', dpi=6000)
+        plt.show()
 
 if __name__ == '__main__':
     
-    # example_coco = COCO(annotation_file)
+    # coco_predictions = torch.load('/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/inference/fat_pose_2018_val_cocostyle/coco_results.pth')
+    # all_predictions = torch.load('/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/inference/fat_pose_2018_val_cocostyle/predictions.pth')
 
-    # categories = example_coco.loadCats(example_coco.getCatIds())
-    # category_names = [category['name'] for category in categories]
-    # print('Custom COCO categories: \n{}\n'.format(' '.join(category_names)))
-    # print(coco_predictions)
-    # print(all_predictions[:5])
-
-    # # ## Load Image from COCO Dataset
-
-
-    # category_ids = example_coco.getCatIds(catNms=['square'])
-    # image_ids = example_coco.getImgIds(catIds=category_ids)
-    # # image_data = example_coco.loadImgs(image_ids[np.random.randint(0, len(image_ids))])[0]
-    # image_data = example_coco.loadImgs(image_ids[100])[0]
-    # viewpoints_xyz = np.array(example_coco.dataset['viewpoints'])
-    # inplane_rotations = np.array(example_coco.dataset['inplane_rotations'])
-    # fixed_transforms_dict = example_coco.dataset['fixed_transforms']
-    # camera_intrinsics = example_coco.dataset['camera_intrinsic_settings']
-
-    # print(image_data)
-    # annotation_ids = example_coco.getAnnIds(imgIds=image_data['id'], catIds=category_ids, iscrowd=None)
-    # annotations = example_coco.loadAnns(annotation_ids)
-    # example_coco.showAnns(annotations)
-
-    # visualize_model_output(image_data)
-    # visualize_annotations(image_data, annotations)
     image_directory = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra'
     annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_val_pose_2018.json'
 
     fat_image = FATImage(coco_annotation_file=annotation_file, coco_image_directory=image_directory)
     image_data, annotations = fat_image.get_random_image()
-    fat_image.visualize_image_annotations(image_data, annotations)
+    # fat_image.visualize_image_annotations(image_data, annotations)
     fat_image.visualize_model_output(image_data)
+    # fat_image.visualize_pose_ros(image_data, annotations, frame='fat_world')
 
 
 

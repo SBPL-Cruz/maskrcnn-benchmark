@@ -82,6 +82,36 @@ LICENSES = [
 ]
 LM6d_root = "/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/"
 
+def filter_for_jpeg(root, files):
+    file_types = ['*.left.jpeg', '*.left.jpg']
+    file_types = r'|'.join([fnmatch.translate(x) for x in file_types])
+    files = [os.path.join(root, f) for f in files]
+    files = [f for f in files if re.match(file_types, f)]
+    
+    return files
+
+def filter_for_annotations(root, files, image_filename):
+    file_types = ['*.seg.png']
+    file_types = r'|'.join([fnmatch.translate(x) for x in file_types])
+    basename_no_extension = os.path.splitext(os.path.basename(image_filename))[0]
+    file_name_prefix = basename_no_extension + '.*'
+    files = [os.path.join(root, f) for f in files]
+    files = [f for f in files if re.match(file_types, f)]
+    files = [f for f in files if re.match(file_name_prefix, os.path.splitext(os.path.basename(f))[0])]
+
+    return files
+
+def filter_for_labels(root, files, image_filename):
+    file_types = ['*.json']
+    file_types = r'|'.join([fnmatch.translate(x) for x in file_types])
+    basename_no_extension = os.path.splitext(os.path.basename(image_filename))[0]
+    file_name_prefix = basename_no_extension + '.*'
+    files = [os.path.join(root, f) for f in files]
+    files = [f for f in files if re.match(file_types, f)]
+    files = [f for f in files if re.match(file_name_prefix, os.path.splitext(os.path.basename(f))[0])]
+
+    return files
+
 def render_pose(class_name, fixed_transform, camera_intrinsics, rotation_angles, location):
     width = 960
     height = 540
@@ -125,36 +155,6 @@ def polar2cart(r, theta, phi):
          r * math.cos(theta)
     ]
 
-def filter_for_jpeg(root, files):
-    file_types = ['*.left.jpeg', '*.left.jpg']
-    file_types = r'|'.join([fnmatch.translate(x) for x in file_types])
-    files = [os.path.join(root, f) for f in files]
-    files = [f for f in files if re.match(file_types, f)]
-    
-    return files
-
-def filter_for_annotations(root, files, image_filename):
-    file_types = ['*.seg.png']
-    file_types = r'|'.join([fnmatch.translate(x) for x in file_types])
-    basename_no_extension = os.path.splitext(os.path.basename(image_filename))[0]
-    file_name_prefix = basename_no_extension + '.*'
-    files = [os.path.join(root, f) for f in files]
-    files = [f for f in files if re.match(file_types, f)]
-    files = [f for f in files if re.match(file_name_prefix, os.path.splitext(os.path.basename(f))[0])]
-
-    return files
-
-def filter_for_labels(root, files, image_filename):
-    file_types = ['*.json']
-    file_types = r'|'.join([fnmatch.translate(x) for x in file_types])
-    basename_no_extension = os.path.splitext(os.path.basename(image_filename))[0]
-    file_name_prefix = basename_no_extension + '.*'
-    files = [os.path.join(root, f) for f in files]
-    files = [f for f in files if re.match(file_types, f)]
-    files = [f for f in files if re.match(file_name_prefix, os.path.splitext(os.path.basename(f))[0])]
-
-    return files
-
 def get_viewpoint_rotations_from_id(viewpoints_xyz, viewpoint_id):
     viewpoint_xyz = get_viewpoint_from_id(viewpoints_xyz, viewpoint_id)
     r, theta, phi = cart2sphere(viewpoint_xyz[0], viewpoint_xyz[1], viewpoint_xyz[2])
@@ -188,6 +188,9 @@ def find_inplane_rotation_id(inplane_rot_angles, angle):
 def get_wxyz_quaternion(quat_xyzw):
     return [quat_xyzw[3]]+quat_xyzw[0:3]
 
+def get_xyzw_quaternion(quat_wxyz):
+    return quat_wxyz[1:4] + [quat_wxyz[0]]
+
 def euler2sphere(theta, phi):
     # phi = phi
 
@@ -208,6 +211,47 @@ def sphere2euler(theta, phi):
     # if phi < 0:
     #     phi += 2*math.pi
     return theta, phi
+
+
+def get_object_pose_in_world(object_pose, camera_pose, fat_world_pose=None, type='quat'):
+    object_pose_matrix = np.zeros((4,4))
+    object_pose_matrix[:3,:3] = RT_transform.quat2mat(get_wxyz_quaternion(object_pose['quaternion_xyzw']))
+    object_pose_matrix[:,3] = object_pose['location'] + [1]
+
+    camera_pose_matrix = np.zeros((4,4))
+    camera_pose_matrix[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
+    camera_pose_matrix[:, 3] = camera_pose['location_worldframe'] + [1]
+
+    object_pose_world = np.matmul(camera_pose_matrix, object_pose_matrix)
+
+    if fat_world_pose is not None:
+        fat_world_matrix = np.zeros((4,4))
+        fat_world_matrix[:3,:3] = RT_transform.quat2mat(get_wxyz_quaternion(fat_world_pose['quaternion_xyzw']))
+        fat_world_matrix[:,3] = fat_world_pose['location'] + [1]
+        object_pose_world = np.matmul(fat_world_matrix, object_pose_world)
+
+    # print(object_pose_world)
+    if type == 'quat':
+        quat = RT_transform.mat2quat(object_pose_world[:3, :3]).tolist()
+        return object_pose_world[:3,3], get_xyzw_quaternion(quat)
+
+
+def get_camera_pose_in_world(camera_pose, fat_world_pose=None, type='quat'):
+    camera_pose_matrix = np.zeros((4,4))
+    camera_pose_matrix[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
+    camera_pose_matrix[:, 3] = camera_pose['location_worldframe'] + [1]
+
+    if fat_world_pose is not None:
+        fat_world_matrix = np.zeros((4,4))
+        fat_world_matrix[:3,:3] = RT_transform.quat2mat(get_wxyz_quaternion(fat_world_pose['quaternion_xyzw']))
+        fat_world_matrix[:,3] = fat_world_pose['location'] + [1]
+        camera_pose_world = np.matmul(fat_world_matrix, camera_pose_matrix)
+    else:
+        camera_pose_world = camera_pose_matrix
+
+    if type == 'quat':
+        quat = RT_transform.mat2quat(camera_pose_world[:3, :3]).tolist()
+        return camera_pose_world[:3,3], get_xyzw_quaternion(quat)
 
 def main():
 
@@ -297,7 +341,7 @@ def main():
             if my_file.is_file():
                 with open(label_filename) as file:
                     label_data = json.load(file)
-                    all_objects_yaw_only = True
+                    # all_objects_yaw_only = True
                     for i in range(0, len(label_data['objects'])):
                         class_name = label_data['objects'][i]['class']
                         class_bounding_box = label_data['objects'][i]['bounding_box']
