@@ -1,4 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+import sys
+if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
+    sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 import torch
 from torchvision import transforms as T
@@ -10,7 +13,6 @@ from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark import layers as L
 from maskrcnn_benchmark.utils import cv2_util
 from dipy.core.geometry import cart2sphere, sphere2cart
-# import sys
 # sys.path.insert(0, "../tools/fat_dataset")
 from convert_fat_coco import *
 
@@ -93,7 +95,7 @@ class COCODemo(object):
         )
         return transform
 
-    def run_on_opencv_image(self, image):
+    def run_on_opencv_image(self, image, use_thresh=False):
         """
         Arguments:
             image (np.ndarray): an image as returned by OpenCV
@@ -118,7 +120,7 @@ class COCODemo(object):
         result = self.overlay_class_names(result, top_predictions)
         if self.cfg.MODEL.POSE_ON:
             # img_list = self.render_poses(top_predictions)
-            rotation_list = self.get_all_rotations(top_predictions)
+            rotation_list = self.get_all_rotations(top_predictions, use_thresh)
 
         if self.cfg.MODEL.MASK_ON:
             if self.cfg.MODEL.POSE_ON:
@@ -127,9 +129,9 @@ class COCODemo(object):
         else:
             return result
 
-    def get_all_rotations(self, top_predictions):
+    def get_all_rotations(self, top_predictions, use_thresh):
         top_viewpoint_ids, top_inplane_rotation_ids = \
-            self.select_top_rotations(top_predictions, use_thresh=False)
+            self.select_top_rotations(top_predictions, use_thresh=use_thresh)
         labels = top_predictions.get_field("labels").tolist()
         labels = [self.CATEGORIES[i] for i in labels]
         rotations = {}
@@ -186,16 +188,22 @@ class COCODemo(object):
         inplane_rotation_scores = prediction.get_field("inplane_rotation_scores")
 
         if use_thresh:
-            top_viewpoint_scores = viewpoint_scores > 0.05
-            top_inplane_rotation_scores = inplane_rotation_scores > 0.1
-
-            for i in range(top_viewpoint_scores.shape[0]):
-                top_viewpoint_ids.append(
-                    torch.nonzero(top_viewpoint_scores[i, :]).numpy().flatten().tolist()
-                )
-                top_inplane_rotation_ids.append(
-                    torch.nonzero(top_inplane_rotation_scores[i, :]).numpy().flatten().tolist()
-                )
+            print("Using score threshold for viewpoints and inplane rotation")
+            top_viewpoint_ids = torch.topk(viewpoint_scores, 3, dim=1, largest=True, sorted=True)[1]
+            top_inplane_rotation_ids = torch.topk(inplane_rotation_scores, 3, dim=1)[1]
+            # print(top_viewpoint_indices)
+            # top_viewpoint_scores = viewpoint_scores > 0.01
+            # top_inplane_rotation_scores = inplane_rotation_scores > 0.1
+            # # Do for each box
+            # for i in range(top_viewpoint_scores.shape[0]):
+            #     # Add indexes which are non-zero after thresholding
+                
+            #     top_viewpoint_ids.append(
+            #         torch.nonzero(top_viewpoint_scores[i, :]).numpy().flatten().tolist()
+            #     )
+            #     top_inplane_rotation_ids.append(
+            #         torch.nonzero(top_inplane_rotation_scores[i, :]).numpy().flatten().tolist()
+            #     )
         else:
             top_viewpoint_ids = torch.argmax(viewpoint_scores, dim=1).numpy().tolist()
             top_inplane_rotation_ids = torch.argmax(inplane_rotation_scores, dim=1).numpy().tolist()

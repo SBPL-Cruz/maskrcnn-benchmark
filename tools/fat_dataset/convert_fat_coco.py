@@ -252,6 +252,8 @@ def get_camera_pose_in_world(camera_pose, fat_world_pose=None, type='quat'):
     if type == 'quat':
         quat = RT_transform.mat2quat(camera_pose_world[:3, :3]).tolist()
         return camera_pose_world[:3,3], get_xyzw_quaternion(quat)
+    elif type == 'rot':
+        return camera_pose_world
 
 def main():
 

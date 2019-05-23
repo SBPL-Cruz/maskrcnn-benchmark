@@ -1,7 +1,7 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
   # WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/fat_trained_models/model_final_pose_50k.pth"
-  WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/model_0050000.pth"
+  WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/model_final.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
   RESNETS:
