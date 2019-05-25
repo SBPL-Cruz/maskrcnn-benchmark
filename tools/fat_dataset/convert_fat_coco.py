@@ -223,7 +223,8 @@ def get_object_pose_in_world(object_pose, camera_pose, fat_world_pose=None, type
     camera_pose_matrix[:, 3] = camera_pose['location_worldframe'] + [1]
 
     object_pose_world = np.matmul(camera_pose_matrix, object_pose_matrix)
-
+    # scale = np.array([[0.01,0,0,0],[0,0.01,0,0],[0,0,0.01,0],[0,0,0,1]])
+    # object_pose_world = np.matmul(scale, object_pose_world)
     if fat_world_pose is not None:
         fat_world_matrix = np.zeros((4,4))
         fat_world_matrix[:3,:3] = RT_transform.quat2mat(get_wxyz_quaternion(fat_world_pose['quaternion_xyzw']))
@@ -236,10 +237,13 @@ def get_object_pose_in_world(object_pose, camera_pose, fat_world_pose=None, type
         return object_pose_world[:3,3], get_xyzw_quaternion(quat)
 
 
-def get_camera_pose_in_world(camera_pose, fat_world_pose=None, type='quat'):
+def get_camera_pose_in_world(camera_pose, fat_world_pose=None, type='quat', cam_to_body=None):
     camera_pose_matrix = np.zeros((4,4))
     camera_pose_matrix[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
     camera_pose_matrix[:, 3] = camera_pose['location_worldframe'] + [1]
+
+    if cam_to_body is not None:
+        camera_pose_matrix = np.matmul(camera_pose_matrix, np.linalg.inv(cam_to_body))
 
     if fat_world_pose is not None:
         fat_world_matrix = np.zeros((4,4))

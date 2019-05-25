@@ -17,8 +17,9 @@ from dipy.core.geometry import cart2sphere, sphere2cart
 from convert_fat_coco import *
 from mpl_toolkits.axes_grid1 import ImageGrid
 
-
-
+from lib.utils.mkdir_if_missing import mkdir_if_missing
+from lib.render_glumpy.render_py import Render_Py
+from lib.pair_matching import RT_transform
 
 class FATImage:
     def __init__(self, coco_annotation_file=None, coco_image_directory=None):
@@ -47,13 +48,25 @@ class FATImage:
         self.world_to_fat_world['location'] = [0,0,0]
         self.world_to_fat_world['quaternion_xyzw'] = [0.853, -0.147, -0.351, -0.357]
         self.model_dir = "/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/"
+        self.rendered_root_dir = os.path.join(self.model_dir, "rendered")
+        mkdir_if_missing(self.rendered_root_dir)
 
+        self.search_resolution_translation = 0.08
+        self.search_resolution_yaw = 0.3926991
+
+        # This matrix converts camera frame (X pointing out) to camera optical frame (Z pointing out) 
+        # Multiply by this matrix to convert camera frame to camera optical frame
+        # Multiply by inverse of this matrix to convert camera optical frame to camera frame
+        self.cam_to_body = np.array([[0, 0, 1, 0],
+                                     [-1, 0, 0, 0],
+                                     [0, -1, 0, 0],
+                                     [0, 0, 0, 1]])
         # self.world_to_fat_world['quaternion_xyzw'] = [0.7071, 0, 0, -0.7071]
 
     def get_random_image(self):
         # image_data = self.example_coco.loadImgs(self.image_ids[np.random.randint(0, len(self.image_ids))])[0]
-        # image_data = self.example_coco.loadImgs(self.image_ids[22])[0]
-        image_data = self.example_coco.loadImgs(self.image_ids[91])[0]
+        image_data = self.example_coco.loadImgs(self.image_ids[22])[0]
+        # image_data = self.example_coco.loadImgs(self.image_ids[91])[0]
         # print(image_data)
         annotation_ids = self.example_coco.getAnnIds(imgIds=image_data['id'], catIds=self.category_ids, iscrowd=None)
         annotations = self.example_coco.loadAnns(annotation_ids)
@@ -62,35 +75,6 @@ class FATImage:
 
         return image_data, annotations
     
-    def get_renderer(self, class_name):
-        width = 960
-        height = 540
-        K = np.array([[self.camera_intrinsics['fx'], 0, self.camera_intrinsics['cx']], 
-                    [0, self.camera_intrinsics['fy'], self.camera_intrinsics['cy']], 
-                    [0, 0, 1]])
-        ZNEAR = 0.1
-        ZFAR = 20
-        model_dir = os.path.join(self.model_dir, "models", class_name)
-        render_machine = Render_Py(model_dir, K, width, height, ZNEAR, ZFAR)
-        return render_machine
-
-    def render_pose(self, class_name, render_machine, rotation_angles, location):
-        fixed_transform = np.transpose(np.array(self.fixed_transforms_dict[class_name]))
-        fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
-        object_world_transform = np.zeros((4,4))
-        object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1],rotation_angles[2])
-        object_world_transform[:,3] = [i/100 for i in location] + [1]
-
-        total_transform = np.matmul(object_world_transform, fixed_transform)
-        pose_rendered_q = RT_transform.mat2quat(total_transform[:3,:3]).tolist() + total_transform[:3,3].flatten().tolist()
-        
-        rgb_gl, depth_gl = render_machine.render(
-            pose_rendered_q[:4], np.array(pose_rendered_q[4:])
-        )
-        rgb_gl = rgb_gl.astype("uint8")
-
-        depth_gl = (depth_gl * self.depth_factor).astype(np.uint16)
-        return rgb_gl, depth_gl
 
     def visualize_image_annotations(self, image_data, annotations):
         if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
@@ -156,7 +140,7 @@ class FATImage:
 
         return max_min_dict
 
-    def visualize_pose_ros(self, image_data, annotations, frame='camera'):
+    def visualize_pose_ros(self, image_data, annotations, frame='camera', camera_optical_frame=True):
         print("ROS visualizing")
         if '/opt/ros/kinetic/lib/python2.7/dist-packages' not in sys.path:
             sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
@@ -200,6 +184,8 @@ class FATImage:
             'ymax' : -np.inf,
             'zmax' : -np.inf
         }
+
+        cam_to_body = self.cam_to_body if camera_optical_frame == False else None
         # while not rospy.is_shutdown():
         for i in range(10):
             for annotation in annotations:
@@ -210,11 +196,13 @@ class FATImage:
 
                 if frame == 'fat_world':
                     location, quat = get_object_pose_in_world(annotation, annotation['camera_pose'])
-                    camera_location, camera_quat = get_camera_pose_in_world(annotation['camera_pose'])      
+                    camera_location, camera_quat = get_camera_pose_in_world(annotation['camera_pose'], None, type='quat', cam_to_body=cam_to_body)      
 
                 if frame == 'world':
                     location, quat = get_object_pose_in_world(annotation, annotation['camera_pose'], self.world_to_fat_world)
-                    camera_location, camera_quat = get_camera_pose_in_world(annotation['camera_pose'], self.world_to_fat_world)      
+                    camera_location, camera_quat = get_camera_pose_in_world(
+                                                        annotation['camera_pose'], self.world_to_fat_world, type='quat', cam_to_body=cam_to_body
+                                                    )      
 
                 object_pose_msg.poses.append(self.get_ros_pose(location, quat))
                 max_min_dict = self.update_coordinate_max_min(max_min_dict, location)
@@ -234,35 +222,131 @@ class FATImage:
             self.ros_rate.sleep()
         return max_min_dict
 
-    def visualize_perch_output(self, image_data, annotations, max_min_dict, frame='fat_world'):
+    def get_renderer(self, class_name):
+        width = 960
+        height = 540
+        K = np.array([[self.camera_intrinsics['fx'], 0, self.camera_intrinsics['cx']], 
+                    [0, self.camera_intrinsics['fy'], self.camera_intrinsics['cy']], 
+                    [0, 0, 1]])
+        ZNEAR = 0.1
+        ZFAR = 20
+        model_dir = os.path.join(self.model_dir, "models", class_name)
+        render_machine = Render_Py(model_dir, K, width, height, ZNEAR, ZFAR)
+        return render_machine
+
+    def render_pose(self, class_name, render_machine, rotation_angles, location):
+        # Takes rotation and location in camera frame for object and renders and image for it
+        # Expects location in meters
+
+        fixed_transform = np.transpose(np.array(self.fixed_transforms_dict[class_name]))
+        fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
+        object_world_transform = np.zeros((4,4))
+        object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1],rotation_angles[2])
+        object_world_transform[:,3] = location + [1]
+
+        total_transform = np.matmul(object_world_transform, fixed_transform)
+        # total_transform = object_world_transform
+        pose_rendered_q = RT_transform.mat2quat(total_transform[:3,:3]).tolist() + total_transform[:3,3].flatten().tolist()
+        
+        rgb_gl, depth_gl = render_machine.render(
+            pose_rendered_q[:4], np.array(pose_rendered_q[4:])
+        )
+        rgb_gl = rgb_gl.astype("uint8")
+
+        depth_gl = (depth_gl * self.depth_factor).astype(np.uint16)
+        return rgb_gl, depth_gl
+   
+    def render_perch_poses(self, max_min_dict, required_object, camera_pose):
+        if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
+            sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+        import cv2
+
+        render_machine = self.get_renderer(required_object)
+        idx = 0
+        rendered_dir = os.path.join(self.rendered_root_dir, required_object)
+        mkdir_if_missing(rendered_dir)
+        rendered_pose_list_out = []
+        for x in np.arange(max_min_dict['xmin'], max_min_dict['xmax'], self.search_resolution_translation):
+            for y in np.arange(max_min_dict['ymin'], max_min_dict['ymax'], self.search_resolution_translation):
+                for theta in np.arange(0, 2 * np.pi, self.search_resolution_yaw):
+                    original_point = np.array([x, y, (max_min_dict['zmin']+max_min_dict['zmin'])/2, 1])
+                    object_world_transform = np.zeros((4,4))
+                    object_world_transform[:3,:3] = RT_transform.euler2mat(-np.pi/2, 0, theta)
+                    object_world_transform[:,3] = original_point.flatten()
+
+                    total_transform = np.matmul(np.linalg.inv(camera_pose), object_world_transform)
+                    rgb_gl, depth_gl = self.render_pose(
+                        required_object, render_machine, 
+                        RT_transform.mat2euler(total_transform[:3,:3]), 
+                        total_transform[:3,3].flatten().tolist()
+                    )
+                    image_file = os.path.join(
+                        rendered_dir,
+                        "{}-color.png".format(idx),
+                    )
+                    depth_file = os.path.join(
+                        rendered_dir,
+                        "{}-depth.png".format(idx),
+                    )
+                    cv2.imwrite(image_file, rgb_gl)
+                    cv2.imwrite(depth_file, depth_gl)
+
+                    rendered_pose_list_out.append(original_point.flatten().tolist() + [0,0,theta])
+                    idx += 1
+
+        pose_rendered_file = os.path.join(
+            rendered_dir,
+            "poses.txt",
+        )
+        np.savetxt(pose_rendered_file, np.around(rendered_pose_list_out, 4))
+    
+    def visualize_perch_output(self, image_data, annotations, max_min_dict, frame='fat_world', 
+            use_external_render=0, required_object='004_sugar_box', camera_optical_frame=True
+        ):
         from perch import FATPerch
         print("camera instrinsics : {}".format(self.camera_intrinsics))
+        print("max_min_ranges : {}".format(max_min_dict))
+        
+        cam_to_body = self.cam_to_body if camera_optical_frame == False else None
+
+        # Get camera pose for PERCH and rendering objects if needed
+        if frame == 'fat_world':
+            camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], None, 'rot', cam_to_body=cam_to_body)
+        if frame == 'world':
+            camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], self.world_to_fat_world, 'rot', cam_to_body=cam_to_body)
+        camera_pose[:3, 3] /= 100 
+        print("camera_pose : {}".format(camera_pose))
+
+
+        # Render poses if necessary
+        if use_external_render == 1:
+            self.render_perch_poses(max_min_dict, required_object, camera_pose)
+
+        # Prepare data to send to PERCH
         color_img_path = os.path.join(image_directory, image_data['file_name'])
         depth_img_path = color_img_path.replace('.jpg', '.depth.png')
         input_image_files = {
             'input_color_image' : color_img_path,
             'input_depth_image' : depth_img_path
         } 
-
-        if frame == 'fat_world':
-            camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], None, 'rot')
-        if frame == 'world':
-            camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], self.world_to_fat_world, 'rot')
-
-        camera_pose[:3, 3] /= 100 
-        print("camera_pose : {}".format(camera_pose))
-        print("max_min_ranges : {}".format(max_min_dict))
         camera_pose = camera_pose.flatten().tolist()
         params = {
             'x_min' : max_min_dict['xmin'],
             'x_max' : max_min_dict['xmax'],
             'y_min' : max_min_dict['ymin'],
             'y_max' : max_min_dict['ymax'],
-            'required_object' : '004_sugar_box',
+            # 'x_min' : max_min_dict['xmin'],
+            # 'x_max' : max_min_dict['xmax'] + self.search_resolution_translation,
+            # 'y_min' : max_min_dict['ymin'],
+            # 'y_max' : max_min_dict['ymin'] + 2 * self.search_resolution_translation,
+            'required_object' : required_object,
             'table_height' :  max_min_dict['zmin'],
-            'use_external_render' : 0, 
+            'use_external_render' : use_external_render, 
             'camera_pose': camera_pose,
-            'reference_frame_': frame
+            'reference_frame_': frame,
+            'search_resolution_translation': self.search_resolution_translation,
+            'search_resolution_yaw': self.search_resolution_yaw,
+            'image_debug' : 1
         }
         camera_params = {
             'camera_width' : 960,
@@ -274,7 +358,11 @@ class FATImage:
             'camera_znear' : 0.1,
             'camera_zfar' : 20,
         }
-        fat_perch = FATPerch(params=params, input_image_files=input_image_files, camera_params=camera_params)
+        fat_perch = FATPerch(
+            params=params, 
+            input_image_files=input_image_files, 
+            camera_params=camera_params
+        )
 
     def visualize_model_output(self, image_data, use_thresh=False):
         # plt.figure()
@@ -375,7 +463,7 @@ class FATImage:
                         xyz_rotation_angles = [phi, theta, inplane_rotation_angle]
                         print("{}. Recovered rotation : {}".format(grid_i, xyz_rotation_angles))
                         rgb_gl, depth_gl = self.render_pose(
-                            label, render_machine, xyz_rotation_angles, [0,0,100]
+                            label, render_machine, xyz_rotation_angles, [0,0,1]
                         )
                         grid[grid_i].imshow(cv2.cvtColor(rgb_gl, cv2.COLOR_BGR2RGB))
                         grid[grid_i].axis("off")
@@ -400,10 +488,14 @@ if __name__ == '__main__':
     fat_image = FATImage(coco_annotation_file=annotation_file, coco_image_directory=image_directory)
     image_data, annotations = fat_image.get_random_image()
     # fat_image.visualize_image_annotations(image_data, annotations)
-    fat_image.visualize_model_output(image_data, use_thresh=True)
-    # max_min_dict = fat_image.visualize_pose_ros(image_data, annotations, frame='world')
+    # fat_image.visualize_model_output(image_data, use_thresh=True)
+    max_min_dict = fat_image.visualize_pose_ros(image_data, annotations, frame='world', camera_optical_frame=False)
 
-    # fat_image.visualize_perch_output(image_data, annotations, max_min_dict, frame='world')
+    fat_image.visualize_perch_output(
+        image_data, annotations, max_min_dict, frame='world', 
+        use_external_render=0, required_object='006_mustard_bottle',
+        camera_optical_frame=False
+    )
 
 
 
