@@ -220,6 +220,8 @@ class FATImage:
                 #     print(e)
             self.objects_pose_pub.publish(object_pose_msg)
             self.ros_rate.sleep()
+
+        # max_min_dict['ymax'] = max_min_dict['ymin'] + 2 * self.search_resolution_translation
         return max_min_dict
 
     def get_renderer(self, class_name):
@@ -489,12 +491,21 @@ if __name__ == '__main__':
     image_data, annotations = fat_image.get_random_image()
     # fat_image.visualize_image_annotations(image_data, annotations)
     # fat_image.visualize_model_output(image_data, use_thresh=True)
-    max_min_dict = fat_image.visualize_pose_ros(image_data, annotations, frame='world', camera_optical_frame=False)
+
+    # max_min_dict = fat_image.visualize_pose_ros(image_data, annotations, frame='world', camera_optical_frame=False)
+
+    # fat_image.visualize_perch_output(
+    #     image_data, annotations, max_min_dict, frame='world', 
+    #     use_external_render=0, required_object='006_mustard_bottle',
+    #     camera_optical_frame=False
+    # )
+
+    max_min_dict = fat_image.visualize_pose_ros(image_data, annotations, frame='world', camera_optical_frame=True)
 
     fat_image.visualize_perch_output(
         image_data, annotations, max_min_dict, frame='world', 
-        use_external_render=0, required_object='006_mustard_bottle',
-        camera_optical_frame=False
+        use_external_render=1, required_object='006_mustard_bottle',
+        camera_optical_frame=True
     )
 
 

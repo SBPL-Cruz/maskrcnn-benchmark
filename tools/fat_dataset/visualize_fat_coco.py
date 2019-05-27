@@ -75,7 +75,7 @@ def render_pose(rendered_dir, count, class_name, fixed_transforms_dict, camera_i
 
 
 image_directory = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/'
-annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_limited_2018.json'
+annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_2018.json'
 
 example_coco = COCO(annotation_file)
 camera_intrinsics = example_coco.dataset['camera_intrinsic_settings']
@@ -92,9 +92,10 @@ print('Custom COCO supercategories: \n{}'.format(' '.join(category_names)))
 
 category_ids = example_coco.getCatIds(catNms=['square'])
 image_ids = example_coco.getImgIds(catIds=category_ids)
+print(len(image_ids))
 # image_data = example_coco.loadImgs(image_ids[np.random.randint(0, len(image_ids))])[0]
 # image_data = example_coco.loadImgs(image_ids[8])[0]
-image_data = example_coco.loadImgs(image_ids[1995])[0]
+image_data = example_coco.loadImgs(image_ids[0])[0]
 
 print(image_data)
 directory = './output'
@@ -102,7 +103,7 @@ if not os.path.exists(directory):
     os.makedirs(directory)
 else:
     shutil.rmtree(directory, ignore_errors=True)
-    # os.makedirs(directory)
+    os.makedirs(directory)
 
 plt.figure()
 image = io.imread(image_directory + image_data['file_name'])
@@ -116,6 +117,7 @@ pylab.rcParams['figure.figsize'] = (8.0, 10.0)
 annotation_ids = example_coco.getAnnIds(imgIds=image_data['id'], catIds=category_ids, iscrowd=None)
 annotations = example_coco.loadAnns(annotation_ids)
 example_coco.showAnns(annotations)
+plt.savefig(os.path.join(directory, 'masks.png'))
 # print(annotations)
 
 
