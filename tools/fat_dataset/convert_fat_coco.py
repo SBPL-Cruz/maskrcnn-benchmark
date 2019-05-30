@@ -32,12 +32,12 @@ from lib.utils.mkdir_if_missing import mkdir_if_missing
 
 ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra'
 SCENES = [ \
-            "kitchen_0", "kitchen_1", "kitchen_2", "kitchen_3", 
-        #   "kitchen_4",
-            "kitedemo_0", "kitedemo_1", "kitedemo_2", "kitedemo_3", 
-        #   "kitedemo_4",
-            "temple_0", "temple_1", "temple_2", "temple_3", 
-        #   "temple_4"  
+        #   "kitchen_0", "kitchen_1", "kitchen_2", "kitchen_3", 
+           "kitchen_4",
+        #    "kitedemo_0", "kitedemo_1", "kitedemo_2", "kitedemo_3", 
+           "kitedemo_4",
+        #    "temple_0", "temple_1", "temple_2", "temple_3", 
+           "temple_4"  
           ]
 IMAGE_DIR_LIST = [
         # os.path.join(ROOT_DIR, "kitchen_0"),
@@ -92,7 +92,7 @@ inplane_rot_angles = np.linspace(-math.pi, math.pi, 68)
 
 # ROOT_OUTDIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/train'
 # OUTFILE_NAME = 'instances_fat_train_pose_limited_2018'
-OUTFILE_NAME = 'instances_fat_train_pose_2018'
+OUTFILE_NAME = 'instances_fat_val_pose_2018'
 
 INFO = {
     "description": "Example Dataset",
@@ -248,18 +248,20 @@ def get_object_pose_in_world(object_pose, camera_pose, fat_world_pose=None, type
     object_pose_matrix[:3,:3] = RT_transform.quat2mat(get_wxyz_quaternion(object_pose['quaternion_xyzw']))
     object_pose_matrix[:,3] = object_pose['location'] + [1]
 
-    camera_pose_matrix = np.zeros((4,4))
-    camera_pose_matrix[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
-    camera_pose_matrix[:, 3] = camera_pose['location_worldframe'] + [1]
+    # camera_pose_matrix = np.zeros((4,4))
+    # camera_pose_matrix[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
+    # camera_pose_matrix[:, 3] = camera_pose['location_worldframe'] + [1]
+
+    camera_pose_matrix = get_camera_pose_in_world(camera_pose, fat_world_pose, type='rot', cam_to_body=None)
 
     object_pose_world = np.matmul(camera_pose_matrix, object_pose_matrix)
     # scale = np.array([[0.01,0,0,0],[0,0.01,0,0],[0,0,0.01,0],[0,0,0,1]])
     # object_pose_world = np.matmul(scale, object_pose_world)
-    if fat_world_pose is not None:
-        fat_world_matrix = np.zeros((4,4))
-        fat_world_matrix[:3,:3] = RT_transform.quat2mat(get_wxyz_quaternion(fat_world_pose['quaternion_xyzw']))
-        fat_world_matrix[:,3] = fat_world_pose['location'] + [1]
-        object_pose_world = np.matmul(fat_world_matrix, object_pose_world)
+    # if fat_world_pose is not None:
+    #     fat_world_matrix = np.zeros((4,4))
+    #     fat_world_matrix[:3,:3] = RT_transform.quat2mat(get_wxyz_quaternion(fat_world_pose['quaternion_xyzw']))
+    #     fat_world_matrix[:,3] = fat_world_pose['location'] + [1]
+    #     object_pose_world = np.matmul(fat_world_matrix, object_pose_world)
 
     # print(object_pose_world)
     if type == 'quat':
@@ -268,9 +270,18 @@ def get_object_pose_in_world(object_pose, camera_pose, fat_world_pose=None, type
 
 
 def get_camera_pose_in_world(camera_pose, fat_world_pose=None, type='quat', cam_to_body=None):
+    # print(camera_pose)
+    # this matrix gives world to camera transform
     camera_pose_matrix = np.zeros((4,4))
-    camera_pose_matrix[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
-    camera_pose_matrix[:, 3] = camera_pose['location_worldframe'] + [1]
+    # camera_rotation = np.linalg.inv(RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe'])))
+    camera_rotation = RT_transform.quat2mat(get_wxyz_quaternion(camera_pose['quaternion_xyzw_worldframe']))
+    camera_pose_matrix[:3, :3] = camera_rotation
+    camera_location = [i for i in camera_pose['location_worldframe']]
+    # camera_pose_matrix[:, 3] = np.matmul(-1 * camera_rotation, camera_location).tolist() + [1]
+    camera_pose_matrix[:, 3] = camera_location + [1]
+
+    # # make it camera to world
+    # camera_pose_matrix = np.linalg.inv(camera_pose_matrix)
 
     if cam_to_body is not None:
         camera_pose_matrix = np.matmul(camera_pose_matrix, np.linalg.inv(cam_to_body))
@@ -282,6 +293,9 @@ def get_camera_pose_in_world(camera_pose, fat_world_pose=None, type='quat', cam_
         camera_pose_world = np.matmul(fat_world_matrix, camera_pose_matrix)
     else:
         camera_pose_world = camera_pose_matrix
+
+    # make it camera to world
+    # camera_pose_world = np.linalg.inv(camera_pose_world)
 
     if type == 'quat':
         quat = RT_transform.mat2quat(camera_pose_world[:3, :3]).tolist()

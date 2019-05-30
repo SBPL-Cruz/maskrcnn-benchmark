@@ -186,12 +186,11 @@ class COCODemo(object):
 
         viewpoint_scores = prediction.get_field("viewpoint_scores")
         inplane_rotation_scores = prediction.get_field("inplane_rotation_scores")
-
         if use_thresh:
             print("Using score threshold for viewpoints and inplane rotation")
             top_viewpoint_ids = torch.topk(viewpoint_scores, 3, dim=1, largest=True, sorted=True)[1]
             top_inplane_rotation_ids = torch.topk(inplane_rotation_scores, 3, dim=1)[1]
-            # print(top_viewpoint_indices)
+            print(top_viewpoint_ids)
             # top_viewpoint_scores = viewpoint_scores > 0.01
             # top_inplane_rotation_scores = inplane_rotation_scores > 0.1
             # # Do for each box
