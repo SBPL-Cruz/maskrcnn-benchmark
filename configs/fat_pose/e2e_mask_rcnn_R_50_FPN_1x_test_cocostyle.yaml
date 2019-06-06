@@ -36,7 +36,7 @@ MODEL:
   POSE_ON: True
 DATASETS:
   TRAIN: ("fat_pose_2018_train_cocostyle",)
-  TEST: ("fat_pose_2018_val_cocostyle",)
+  TEST: ("fat_pose_2018_train_cocostyle",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
   NUM_WORKERS: 0

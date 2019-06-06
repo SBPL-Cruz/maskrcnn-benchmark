@@ -86,6 +86,19 @@ class FATImage:
 
         return image_data, annotations
     
+    def save_yaw_only_dataset(self, scene='all'):
+        print("Processing {} images".format(len(self.image_ids)))
+        num_images = len(self.image_ids)
+        # num_images = 10
+        for i in range(num_images):
+            image_data = self.example_coco.loadImgs(self.image_ids[i])[0]
+            if scene != 'all' and  image_data['file_name'].startswith(scene) == False:
+                continue
+            annotation_ids = self.example_coco.getAnnIds(imgIds=image_data['id'], catIds=self.category_ids, iscrowd=None)
+            annotations = self.example_coco.loadAnns(annotation_ids)
+            yaw_only_objects, _ = fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
+
+
 
     def visualize_image_annotations(self, image_data, annotations):
         if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
@@ -313,7 +326,7 @@ class FATImage:
             return table_pose_msg, scene_cloud, camera_pose_matrix
 
 
-    def visualize_pose_ros(self, image_data, annotations, frame='camera', camera_optical_frame=True):
+    def visualize_pose_ros(self, image_data, annotations, frame='camera', camera_optical_frame=True, num_publish=10):
         print("ROS visualizing")
         if '/opt/ros/kinetic/lib/python2.7/dist-packages' not in sys.path:
             sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
@@ -322,23 +335,26 @@ class FATImage:
         import rosparam
         from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Quaternion
         from sensor_msgs.msg import Image, PointCloud2
-        # if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
-        #     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-        # from cv_bridge import CvBridge, CvBridgeError
+        if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
+            sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+        if '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/ros_python3_ws/install/lib/python3/dist-packages' not in sys.path:
+            sys.path.append('/media/aditya/A69AFABA9AFA85D9/Cruzr/code/ros_python3_ws/install/lib/python3/dist-packages')
+        # These packages need to be python3 specific, cv2 is imported from environment, cv_bridge is built using python3
+        import cv2
+        from cv_bridge import CvBridge, CvBridgeError
 
         rospy.init_node('fat_pose')
         self.ros_rate = rospy.Rate(5)
         self.objects_pose_pub = rospy.Publisher('fat_image/objects_pose', PoseArray, queue_size=1, latch=True)
         self.camera_pose_pub = rospy.Publisher('fat_image/camera_pose', PoseStamped, queue_size=1, latch=True)
-        self.scene_image_pub = rospy.Publisher("fat_image/scene_image", Image)
+        self.scene_color_image_pub = rospy.Publisher("fat_image/scene_color_image", Image)
         self.table_pose_pub = rospy.Publisher("fat_image/table_pose", PoseStamped, queue_size=1, latch=True)
         self.scene_cloud_pub = rospy.Publisher("fat_image/scene_cloud", PointCloud2, queue_size=1, latch=True)
-        # self.bridge = CvBridge()
-        # import cv2
+        self.bridge = CvBridge()
             
         color_img_path = os.path.join(self.coco_image_directory, image_data['file_name'])
-        # cv_scene_image = cv2.imread(img_path)
-        # cv2.imshow(cv_scene_image)
+        cv_scene_color_image = cv2.imread(color_img_path)
+        # cv2.imshow(cv_scene_color_image)
         # image = io.imread(img_path)
         # plt.imshow(image); plt.axis('off')
         # plt.show()
@@ -367,7 +383,8 @@ class FATImage:
             table_pose_msg, scene_cloud, camera_pose_table = self.get_camera_pose_relative_table(depth_img_path)
 
         # while not rospy.is_shutdown():
-        for i in range(10):
+        for i in range(num_publish):
+            yaw_only_objects = []
             for annotation in annotations:
                 class_name = self.categories[annotation['category_id']]['name']
 
@@ -377,7 +394,6 @@ class FATImage:
                 if frame == 'table':
                     location, quat = get_object_pose_in_world(annotation, camera_pose_table)
                     camera_location, camera_quat = camera_pose_table['location_worldframe'], camera_pose_table['quaternion_xyzw_worldframe']  
-
 
                 if frame == 'fat_world':
                     location, quat = get_object_pose_in_world(annotation, annotation['camera_pose'])
@@ -400,18 +416,26 @@ class FATImage:
                     self.camera_pose_pub.publish(camera_pose_msg)
 
                 print("Location for {} : {}".format(class_name, location))
-                print("Rotation for {} : {}\n".format(class_name, RT_transform.quat2euler(get_wxyz_quaternion(quat))))
-                    
+                rotation_angles = RT_transform.quat2euler(get_wxyz_quaternion(quat))
+                print("Rotation for {} : {}\n".format(class_name, rotation_angles))
+                if np.all(np.isclose(np.array(rotation_angles[:2]), np.array([-np.pi/2, 0]), atol=0.1)):
+                    yaw_only_objects.append({'annotation_id' : annotation['id'],'class_name' : class_name})
                 # print(location, quat)
-                # try:
-                #     self.scene_image_pub.publish(self.bridge.cv2_to_imgmsg(cv_scene_image, "bgr8"))
-                # except CvBridgeError as e:
-                #     print(e)
+                try:
+                    self.scene_color_image_pub.publish(self.bridge.cv2_to_imgmsg(cv_scene_color_image, "bgr8"))
+                except CvBridgeError as e:
+                    print(e)
             self.objects_pose_pub.publish(object_pose_msg)
             self.ros_rate.sleep()
 
         # max_min_dict['ymax'] = max_min_dict['ymin'] + 2 * self.search_resolution_translation
-        return max_min_dict
+        max_min_dict['ymax'] += 0.05
+        max_min_dict['ymin'] += 0.05
+        max_min_dict['xmax'] += 0.05
+        max_min_dict['xmin'] += 0.05
+        print("Yaw only objects in the image : {}".format(yaw_only_objects))
+
+        return yaw_only_objects, max_min_dict
 
     def get_renderer(self, class_name):
         width = 960
@@ -710,26 +734,26 @@ if __name__ == '__main__':
     # below is error case of table pose
     # image_data, annotations = fat_image.get_random_image(name='kitchen_0/001210.left.jpg')
     # fat_image.visualize_image_annotations(image_data, annotations)
-    # fat_image.visualize_model_output(image_data, use_thresh=True)
+    fat_image.visualize_model_output(image_data, use_thresh=True, write_poses=True)
 
-    # max_min_dict = fat_image.visualize_pose_ros(image_data, annotations, frame='world', camera_optical_frame=False)
-
+    # yaw_only_objects, max_min_dict = fat_image.visualize_pose_ros(image_data, annotations, frame='world', camera_optical_frame=False)
     # fat_image.visualize_perch_output(
     #     image_data, annotations, max_min_dict, frame='world', 
     #     use_external_render=0, required_object='006_mustard_bottle',
     #     camera_optical_frame=False
     # )
 
-    max_min_dict = fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=True)
+    # Using below
+    # yaw_only_objects, max_min_dict = fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
 
     # fat_image.visualize_perch_output(
     #     image_data, annotations, max_min_dict, frame='table', 
-    #     # use_external_render=0, required_object='007_tuna_fish_can',
-    #     use_external_render=1, required_object='006_mustard_bottle',
-    #     camera_optical_frame=True
+    #     use_external_render=0, required_object=['007_tuna_fish_can', '006_mustard_bottle'],
+    #     # use_external_render=0, required_object=['007_tuna_fish_can'],
+    #     camera_optical_frame=False
     # )
 
-
+    # fat_image.save_yaw_only_dataset(scene="kitchen_0")
 
 
 
