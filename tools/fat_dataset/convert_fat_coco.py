@@ -56,8 +56,9 @@ IMAGE_DIR_LIST = [
         # os.path.join(ROOT_DIR, "temple_2"),
         # os.path.join(ROOT_DIR, "temple_3"),
         # os.path.join(ROOT_DIR, "temple_4"),
-        "004_sugar_box_16k",
+        "002_master_chef_can_16k",
         "003_cracker_box_16k",
+        "004_sugar_box_16k",
         "005_tomato_soup_can_16k",
         "006_mustard_bottle_16k",
         "007_tuna_fish_can_16k",
@@ -266,7 +267,7 @@ def get_object_pose_in_world(object_pose, camera_pose, fat_world_pose=None, type
     # print(object_pose_world)
     if type == 'quat':
         quat = RT_transform.mat2quat(object_pose_world[:3, :3]).tolist()
-        return object_pose_world[:3,3], get_xyzw_quaternion(quat)
+        return object_pose_world[:3,3].tolist(), get_xyzw_quaternion(quat)
 
 
 def get_camera_pose_in_world(camera_pose, fat_world_pose=None, type='quat', cam_to_body=None):

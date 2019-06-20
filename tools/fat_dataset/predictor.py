@@ -30,6 +30,7 @@ class COCODemo(object):
         masks_per_dim=2,
         min_image_size=800,
         categories=None,
+        topk_rotations=9,
         # viewpoints_xyz=None,
         # inplane_rotations=None,
         # fixed_transforms_dict=None,
@@ -42,6 +43,7 @@ class COCODemo(object):
         self.model.to(self.device)
         self.min_image_size = min_image_size
         self.CATEGORIES += categories
+        self.topk_rotations = topk_rotations
         # self.viewpoints_xyz = viewpoints_xyz
         # self.inplane_rotations = inplane_rotations
         # self.fixed_transforms_dict = fixed_transforms_dict
@@ -110,7 +112,7 @@ class COCODemo(object):
         result = image.copy()
         if self.show_mask_heatmaps:
             return self.create_mask_montage(result, top_predictions)
-        # result = self.overlay_boxes(result, top_predictions)
+        result, centroids = self.overlay_boxes(result, top_predictions)
         
         if self.cfg.MODEL.MASK_ON:
             mask_list = self.get_all_masks(result, top_predictions)
@@ -124,10 +126,10 @@ class COCODemo(object):
 
         if self.cfg.MODEL.MASK_ON:
             if self.cfg.MODEL.POSE_ON:
-                return result, mask_list, rotation_list
-            return result, mask_list
+                return result, mask_list, rotation_list, centroids
+            return result, mask_list, centroids
         else:
-            return result
+            return result, centroids
 
     def get_all_rotations(self, top_predictions, use_thresh):
         top_viewpoint_ids, top_inplane_rotation_ids = \
@@ -188,8 +190,8 @@ class COCODemo(object):
         inplane_rotation_scores = prediction.get_field("inplane_rotation_scores")
         if use_thresh:
             print("Using score threshold for viewpoints and inplane rotation")
-            top_viewpoint_ids = torch.topk(viewpoint_scores, 3, dim=1, largest=True, sorted=True)[1]
-            top_inplane_rotation_ids = torch.topk(inplane_rotation_scores, 3, dim=1)[1]
+            top_viewpoint_ids = torch.topk(viewpoint_scores, self.topk_rotations, dim=1, largest=True, sorted=True)[1]
+            top_inplane_rotation_ids = torch.topk(inplane_rotation_scores, self.topk_rotations, dim=1)[1]
             print(top_viewpoint_ids)
             # top_viewpoint_scores = viewpoint_scores > 0.01
             # top_inplane_rotation_scores = inplane_rotation_scores > 0.1
@@ -280,15 +282,17 @@ class COCODemo(object):
         boxes = predictions.bbox
 
         colors = self.compute_colors_for_labels(labels).tolist()
-
+        centroids = []
         for box, color in zip(boxes, colors):
             box = box.to(torch.int64)
             top_left, bottom_right = box[:2].tolist(), box[2:].tolist()
             image = cv2.rectangle(
                 image, tuple(top_left), tuple(bottom_right), tuple(color), 1
             )
+            centroids.append((np.array(bottom_right) + np.array(top_left))/2)
 
-        return image
+
+        return image, centroids
 
     def overlay_mask(self, image, predictions):
         """
