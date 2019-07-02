@@ -16,14 +16,21 @@ class FATPerch():
     # OUTPUT_POSES_FILE = 'output_perch_poses.txt'
     # OUTPUT_STATS_FILE = 'output_perch_stats.txt'
 
-    def __init__(self, params=None, input_image_files=None, camera_params=None, object_names=None, output_dir_name=None):
+    def __init__(
+            self, params=None, input_image_files=None, camera_params=None, object_names=None, output_dir_name=None,
+            models_root=None
+        ):
         self.PERCH_EXEC = subprocess.check_output("catkin_find sbpl_perception perch_fat".split(" ")).decode("utf-8").rstrip().lstrip()
         rospack = rospkg.RosPack()
         self.PERCH_ROOT = rospack.get_path('sbpl_perception')
         PERCH_ENV_CONFIG = "{}/config/pr2_env_config.yaml".format(self.PERCH_ROOT)
         PERCH_PLANNER_CONFIG = "{}/config/pr2_planner_config.yaml".format(self.PERCH_ROOT)
         # PERCH_YCB_OBJECTS = "{}/config/roman_objects.xml".format(self.PERCH_ROOT)
-        MODELS_ROOT = "{}/data/YCB_Video_Dataset/aligned_cm".format(self.PERCH_ROOT)
+
+        # aligned_cm textured.ply models are color and have axis according to FAT dataset - use when running perch with network
+        # MODELS_ROOT = "{}/data/YCB_Video_Dataset/aligned_cm".format(self.PERCH_ROOT)
+
+        # modes textured.ply models are color models with original YCB axis - use when using perch without network
         self.object_names = object_names
 
         self.load_ros_param_from_file(PERCH_ENV_CONFIG)
@@ -32,7 +39,7 @@ class FATPerch():
         self.set_ros_param_from_dict(params)
         self.set_ros_param_from_dict(input_image_files)
         self.set_ros_param_from_dict(camera_params)
-        self.set_object_model_params(object_names, MODELS_ROOT)
+        self.set_object_model_params(object_names, models_root)
         self.output_dir_name = output_dir_name
         # self.launch_ros_node(PERCH_YCB_OBJECTS)
         # self.run_perch_node(PERCH_EXEC)
@@ -73,7 +80,7 @@ class FATPerch():
         self.set_ros_param('model_bank', params)
         
     def run_perch_node(self, model_poses_file):
-        command = "{}/mpirun -n 1 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
+        command = "{}/mpirun -n 4 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
         print("Running command : {}".format(command))
         # print(subprocess.check_output(command.split(" ")))
         # output = subprocess.check_output(command, shell=True).decode("utf-8")
@@ -84,6 +91,8 @@ class FATPerch():
         f = open(os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name, 'log.txt'), "w")
         f.write(out)
         f.close()
+
+        # Get annotations from output of PERCH to get accuracy
         annotations = []
         f = open(os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name, 'output_poses.txt'), "r")
         lines = f.readlines()
