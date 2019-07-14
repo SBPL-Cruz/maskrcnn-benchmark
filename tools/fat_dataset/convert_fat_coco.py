@@ -44,7 +44,7 @@ if False:
     object_settings_file = Path(os.path.join(ROOT_DIR, "kitchen_0", "_object_settings.json"))
     camera_settings_file = Path(os.path.join(ROOT_DIR, "kitchen_0", "_camera_settings.json"))
     SYMMETRY_INFO = {
-        "002_master_chef_can_16k" : [0.5, 1 , 0.5],
+        "002_master_chef_can_16k" : [1, 0.5, 0],
         "003_cracker_box_16k" : [0.5, 0.5, 0.5],
         "004_sugar_box_16k" : [0.5, 0.5, 0.5],
         "005_tomato_soup_can_16k" : [0.5, 1, 0.5],
@@ -94,7 +94,7 @@ if False:
 
 if True:
     ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
-    SCENES = [ "NewMap1" ]
+    SCENES = [ "NewMap1_reduced_2" ]
 
     object_settings_file = Path(os.path.join(ROOT_DIR, SCENES[0], "_object_settings.json"))
     camera_settings_file = Path(os.path.join(ROOT_DIR, SCENES[0], "_camera_settings.json"))
@@ -166,35 +166,35 @@ def filter_for_labels(root, files, image_filename):
 
     return files
 
-def render_pose(class_name, fixed_transform, camera_intrinsics, rotation_angles, location):
-    width = 960
-    height = 540
-    K = np.array([[camera_intrinsics['fx'], 0, camera_intrinsics['cx']], 
-                  [0, camera_intrinsics['fy'], camera_intrinsics['cy']], 
-                  [0, 0, 1]])
-    # Check these TODO
-    ZNEAR = 0.1
-    ZFAR = 20
-    depth_factor = 1000
-    model_dir = os.path.join(LM6d_root, "models", class_name)
-    render_machine = Render_Py(model_dir, K, width, height, ZNEAR, ZFAR)
+# def render_pose(class_name, fixed_transform, camera_intrinsics, rotation_angles, location):
+#     width = 960
+#     height = 540
+#     K = np.array([[camera_intrinsics['fx'], 0, camera_intrinsics['cx']], 
+#                   [0, camera_intrinsics['fy'], camera_intrinsics['cy']], 
+#                   [0, 0, 1]])
+#     # Check these TODO
+#     ZNEAR = 0.1
+#     ZFAR = 20
+#     depth_factor = 1000
+#     model_dir = os.path.join(LM6d_root, "models", class_name)
+#     render_machine = Render_Py(model_dir, K, width, height, ZNEAR, ZFAR)
 
-    fixed_transform = np.transpose(np.array(fixed_transform))
-    fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
-    object_world_transform = np.zeros((4,4))
-    object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1],rotation_angles[2])
-    object_world_transform[:,3] = [i/100 for i in location] + [1]
+#     fixed_transform = np.transpose(np.array(fixed_transform))
+#     fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
+#     object_world_transform = np.zeros((4,4))
+#     object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1],rotation_angles[2])
+#     object_world_transform[:,3] = [i/100 for i in location] + [1]
 
-    total_transform = np.matmul(object_world_transform, fixed_transform)
-    pose_rendered_q = RT_transform.mat2quat(total_transform[:3,:3]).tolist() + total_transform[:3,3].flatten().tolist()
+#     total_transform = np.matmul(object_world_transform, fixed_transform)
+#     pose_rendered_q = RT_transform.mat2quat(total_transform[:3,:3]).tolist() + total_transform[:3,3].flatten().tolist()
     
-    rgb_gl, depth_gl = render_machine.render(
-        pose_rendered_q[:4], np.array(pose_rendered_q[4:])
-    )
-    rgb_gl = rgb_gl.astype("uint8")
+#     rgb_gl, depth_gl = render_machine.render(
+#         pose_rendered_q[:4], np.array(pose_rendered_q[4:])
+#     )
+#     rgb_gl = rgb_gl.astype("uint8")
 
-    depth_gl = (depth_gl * depth_factor).astype(np.uint16)
-    return rgb_gl, depth_gl
+#     depth_gl = (depth_gl * depth_factor).astype(np.uint16)
+#     return rgb_gl, depth_gl
 
 def cart2polar(point):
     r = math.sqrt(point[0]**2 + point[1]**2 + point[2]**2)
@@ -266,6 +266,25 @@ def sphere2euler(theta, phi):
     #     phi += 2*math.pi
     return theta, phi
 
+def apply_angle_symmetry(angles, symmetry_info):
+    new_angles = []
+    print("Angles before symmetry : {}".format(angles))
+    for i in range(3):
+        # if symmetry_info[i] == 0.5:
+        #     if angles[i] < 0:
+        #         print("Semi symmetric, beyond 180 angle")
+        #         new_angles.append(angles[i] + np.pi)
+        #     else:
+        #         print("Semi symmetric, within 180 angle")
+        #         new_angles.append(angles[i])
+        if symmetry_info[i] == 1:
+            new_angles.append(0)
+        else:
+            new_angles.append(angles[i])
+    print("Angles after symmetry : {}".format(new_angles))
+        # if symmetry_info[i] == 0:
+        #     new_angles.append(angles[i])
+    return np.array(new_angles)
 
 def get_object_pose_in_world(object_pose, camera_pose, fat_world_pose=None, type='quat'):
     # Returns in cm
@@ -280,6 +299,7 @@ def get_object_pose_in_world(object_pose, camera_pose, fat_world_pose=None, type
     camera_pose_matrix = get_camera_pose_in_world(camera_pose, fat_world_pose, type='rot', cam_to_body=None)
 
     object_pose_world = np.matmul(camera_pose_matrix, object_pose_matrix)
+    # object_pose_world = np.matmul(np.linalg.inv(camera_pose_matrix), object_pose_matrix)
     # scale = np.array([[0.01,0,0,0],[0,0.01,0,0],[0,0,0.01,0],[0,0,0,1]])
     # object_pose_world = np.matmul(scale, object_pose_world)
     # if fat_world_pose is not None:
@@ -338,25 +358,7 @@ def get_segmentation_data_for_scene(IMG_DIR):
         raise Exception("Object settings file not found")
     return SEGMENTATION_DATA
 
-def apply_angle_symmetry(angles, symmetry_info):
-    new_angles = []
-    print(angles)
-    for i in range(3):
-        # if symmetry_info[i] == 0.5:
-        #     if angles[i] < 0:
-        #         print("Semi symmetric, beyond 180 angle")
-        #         new_angles.append(angles[i] + np.pi)
-        #     else:
-        #         print("Semi symmetric, within 180 angle")
-        #         new_angles.append(angles[i])
-        if symmetry_info[i] == 1:
-            new_angles.append(0)
-        else:
-            new_angles.append(angles[i])
 
-        # if symmetry_info[i] == 0:
-        #     new_angles.append(angles[i])
-    return np.array(new_angles)
         
 
 
@@ -465,7 +467,7 @@ def main():
                             class_bounding_box = label_data['objects'][i]['bounding_box']
                             quat = label_data['objects'][i]['quaternion_xyzw']
                             
-                            angles = RT_transform.quat2euler(get_wxyz_quaternion(quat))
+                            angles = RT_transform.quat2euler(get_wxyz_quaternion(quat), 'syxz')
                             # angles = apply_angle_symmetry(angles, SYMMETRY_INFO[class_name])
                             # This function gives angles with this convention of euler - https://en.wikipedia.org/wiki/Euler_angles#Signs_and_ranges (geometric definition)
 

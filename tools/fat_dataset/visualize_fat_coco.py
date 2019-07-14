@@ -42,7 +42,7 @@ def render_pose(rendered_dir, count, class_name, fixed_transforms_dict, camera_i
     fixed_transform = np.transpose(np.array(fixed_transforms_dict[class_name]))
     fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
     object_world_transform = np.zeros((4,4))
-    object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1],rotation_angles[2])
+    object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1]+np.pi, rotation_angles[2], 'syxz')
     # object_world_transform[:3,:3] = RT_transform.euler2mat(0,0,0)
     # object_world_transform[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(rotation))
     object_world_transform[:,3] = [i/100 for i in location] + [1]
@@ -51,18 +51,19 @@ def render_pose(rendered_dir, count, class_name, fixed_transforms_dict, camera_i
     # total_transform = np.matmul(np.linalg.inv(camera_pose_matrix), object_world_transform)
     # fixed_transform = np.matmul(m, fixed_transform)
     total_transform = np.matmul(object_world_transform, fixed_transform)
+    # total_transform = object_world_transform
     pose_rendered_q = RT_transform.mat2quat(total_transform[:3,:3]).tolist() + total_transform[:3,3].flatten().tolist()
     # pose_rendered_q = RT_transform.mat2quat(object_world_transform[:3,:3]).tolist() + object_world_transform[:3,3].flatten().tolist()
     # print(pose_rendered_q)
     # rendered_dir = '.'
-    image_file = os.path.join(
-        rendered_dir,
-        "{}-{}-color.png".format(count, class_name),
-    )
-    depth_file = os.path.join(
-        rendered_dir,
-        "{}-{}-depth.png".format(count, class_name),
-    )
+    # image_file = os.path.join(
+    #     rendered_dir,
+    #     "{}-{}-color.png".format(count, class_name),
+    # )
+    # depth_file = os.path.join(
+    #     rendered_dir,
+    #     "{}-{}-depth.png".format(count, class_name),
+    # )
     rgb_gl, depth_gl = render_machine.render(
         pose_rendered_q[:4], np.array(pose_rendered_q[4:])
     )
@@ -96,7 +97,7 @@ category_ids = example_coco.getCatIds(catNms=['square'])
 image_ids = example_coco.getImgIds(catIds=category_ids)
 print("Number of images : {}".format(len(image_ids)))
 image_data = example_coco.loadImgs(image_ids[np.random.randint(0, len(image_ids))])[0]
-# image_data = example_coco.loadImgs(image_ids[8])[0]
+# image_data = example_coco.loadImgs(image_ids[61])[0]
 # image_data = example_coco.loadImgs(image_ids[0])[0]
 
 print(image_data)
@@ -109,14 +110,14 @@ else:
 
 plt.figure()
 plt.axis("off")
-plt.plot([3,1,4])
+plt.subplot(1,3,1)
 image = io.imread(image_directory + image_data['file_name'])
 # io.imsave(os.path.join(directory, 'original.png'), image)
 
 # plt.imshow(image); plt.axis('off')
 
 # plt.figure()
-# plt.imshow(image); plt.axis('off')
+plt.imshow(image); plt.axis('off')
 pylab.rcParams['figure.figsize'] = (8.0, 10.0)
 annotation_ids = example_coco.getAnnIds(imgIds=image_data['id'], catIds=category_ids, iscrowd=None)
 annotations = example_coco.loadAnns(annotation_ids)
@@ -137,8 +138,13 @@ for annotation in annotations:
     print("*****{}*****".format(class_name))
     print("Recovered rotation : {}".format(xyz_rotation_angles))
     quat = annotation['quaternion_xyzw']
-    print("Actual rotation : {}".format(RT_transform.quat2euler(get_wxyz_quaternion(quat))))
+    print("Actual rotation : {}".format(RT_transform.quat2euler(get_wxyz_quaternion(quat), 'syxz')))
+    # print("Actual rotation : {}".format(RT_transform.quat2euler(get_wxyz_quaternion(quat), 'rxyz')))
     rgb, depth = render_pose(directory, count, class_name, fixed_transforms_dict, 
                     camera_intrinsics, annotation['camera_pose'], xyz_rotation_angles, annotation['location'], annotation['quaternion_xyzw'])
+    plt.subplot(1,3,2)
+    plt.imshow(rgb)    
+    plt.subplot(1,3,3)
+    plt.imshow(depth)    
     count += 1
 plt.show()

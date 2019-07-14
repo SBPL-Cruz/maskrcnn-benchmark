@@ -16,6 +16,15 @@ class FATPerch():
     # OUTPUT_POSES_FILE = 'output_perch_poses.txt'
     # OUTPUT_STATS_FILE = 'output_perch_stats.txt'
 
+    # Symmetry info for Yaw axis
+    # 1 means semi-symmetry and 2 means full symmetry
+    SYMMETRY_INFO = {
+        "004_sugar_box" : 1,
+        "008_pudding_box" : 1,
+        "009_gelatin_box" : 1,
+        "010_potted_meat_can" : 1,
+    }
+
     def __init__(
             self, params=None, input_image_files=None, camera_params=None, object_names=None, output_dir_name=None,
             models_root=None
@@ -35,8 +44,10 @@ class FATPerch():
 
         self.load_ros_param_from_file(PERCH_ENV_CONFIG)
         self.load_ros_param_from_file(PERCH_PLANNER_CONFIG)
+        self.use_external_pose_list = params['use_external_pose_list']
 
         self.set_ros_param_from_dict(params)
+        
         self.set_ros_param_from_dict(input_image_files)
         self.set_ros_param_from_dict(camera_params)
         self.set_object_model_params(object_names, models_root)
@@ -73,7 +84,7 @@ class FATPerch():
                 os.path.join(models_root, object_name, 'textured.ply'),
                 False,
                 False,
-                1,
+                0 if self.use_external_pose_list == 1 else self.SYMMETRY_INFO[object_name],
                 0.06,
                 1
             ])
