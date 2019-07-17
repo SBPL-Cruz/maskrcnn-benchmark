@@ -112,10 +112,10 @@ class COCODemo(object):
         result = image.copy()
         if self.show_mask_heatmaps:
             return self.create_mask_montage(result, top_predictions)
-        result, centroids = self.overlay_boxes(result, top_predictions)
+        result, centroids, boxes = self.overlay_boxes(result, top_predictions)
         
         if self.cfg.MODEL.MASK_ON:
-            mask_list = self.get_all_masks(result, top_predictions)
+            mask_list, overall_binary_mask = self.get_all_masks(result, top_predictions)
             result = self.overlay_mask(result, top_predictions)
         if self.cfg.MODEL.KEYPOINT_ON:
             result = self.overlay_keypoints(result, top_predictions)
@@ -126,8 +126,8 @@ class COCODemo(object):
 
         if self.cfg.MODEL.MASK_ON:
             if self.cfg.MODEL.POSE_ON:
-                return result, mask_list, rotation_list, centroids
-            return result, mask_list, centroids
+                return result, mask_list, rotation_list, centroids, boxes, overall_binary_mask
+            return result, mask_list, centroids, boxes, overall_binary_mask
         else:
             return result, centroids
 
@@ -283,16 +283,18 @@ class COCODemo(object):
 
         colors = self.compute_colors_for_labels(labels).tolist()
         centroids = []
+        box_list = []
         for box, color in zip(boxes, colors):
             box = box.to(torch.int64)
             top_left, bottom_right = box[:2].tolist(), box[2:].tolist()
             image = cv2.rectangle(
                 image, tuple(top_left), tuple(bottom_right), tuple(color), 1
             )
+            box_list.append([top_left, bottom_right])
             centroids.append((np.array(bottom_right) + np.array(top_left))/2)
 
 
-        return image, centroids
+        return image, centroids, box_list
 
     def overlay_mask(self, image, predictions):
         """
@@ -308,7 +310,6 @@ class COCODemo(object):
         labels = predictions.get_field("labels")
 
         colors = self.compute_colors_for_labels(labels).tolist()
-
         for mask, color in zip(masks, colors):
             thresh = mask[0, :, :, None]
             contours, hierarchy = cv2_util.findContours(
@@ -335,6 +336,8 @@ class COCODemo(object):
 
         colors = self.compute_colors_for_labels(labels).tolist()
         mask_list = []
+        overall_binary_mask = np.zeros((image.shape[0], image.shape[1]))
+
         for mask, color in zip(masks, colors):
             thresh = mask[0, :, :, None]
             img = np.zeros((image.shape[0], image.shape[1]))
@@ -342,8 +345,9 @@ class COCODemo(object):
                 thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
             )
             mask_image = cv2.fillPoly(img, pts = contours, color=(255))
+            overall_binary_mask = cv2.fillPoly(overall_binary_mask, pts = contours, color=(255))
             mask_list.append(mask_image)
-        return mask_list
+        return mask_list, overall_binary_mask
 
     def overlay_keypoints(self, image, predictions):
         keypoints = predictions.get_field("keypoints")

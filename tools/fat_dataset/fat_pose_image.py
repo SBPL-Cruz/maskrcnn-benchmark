@@ -639,7 +639,7 @@ class FATImage:
 
     def visualize_perch_output(self, image_data, annotations, max_min_dict, frame='fat_world', 
             use_external_render=0, required_object='004_sugar_box', camera_optical_frame=True,
-            use_external_pose_list=0, model_poses_file=None
+            use_external_pose_list=0, model_poses_file=None, use_centroid_shifting=0, predicted_mask_path=None
         ):
         from perch import FATPerch
         print("camera instrinsics : {}".format(self.camera_intrinsics))
@@ -669,8 +669,10 @@ class FATImage:
         # Prepare data to send to PERCH
         input_image_files = {
             'input_color_image' : color_img_path,
-            'input_depth_image' : depth_img_path
+            'input_depth_image' : depth_img_path,
         } 
+        if predicted_mask_path is not None:
+            input_image_files['predicted_mask_image'] = predicted_mask_path
 
         # Render poses if necessary
         if use_external_render == 1:
@@ -702,7 +704,7 @@ class FATImage:
             'image_debug' : 1,
             'use_external_pose_list': use_external_pose_list,
             'depth_factor': self.depth_factor,
-            'shift_pose_centroid': 1,
+            'shift_pose_centroid': use_centroid_shifting,
             'use_icp': 1
         }
         camera_params = {
@@ -729,7 +731,13 @@ class FATImage:
     def get_clean_name(self, name):
         return name.replace('.jpg', '').replace('.png', '').replace('/', '_').replace('.', '_')
 
-    def visualize_model_output(self, image_data, use_thresh=False):
+    def reject_outliers(self, data, m = 2.):
+        d = np.abs(data - np.mean(data))
+        mdev = np.std(d)
+        s = d/mdev if mdev else 0.
+        return data[s<m]
+
+    def visualize_model_output(self, image_data, use_thresh=False, use_centroid=True):
         # plt.figure()
         # img_path = os.path.join(image_directory, image_data['file_name'])
         # image = io.imread(img_path)
@@ -745,7 +753,7 @@ class FATImage:
         cfg_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/configs/fat_pose/e2e_mask_rcnn_R_50_FPN_1x_test_cocostyle.yaml'
         args = {
             'config_file' : cfg_file,
-            'confidence_threshold' : 0.76,
+            'confidence_threshold' : 0.7,
             'min_image_size' : 750,
             'masks_per_dim' : 10,
             'show_mask_heatmaps' : False
@@ -764,11 +772,15 @@ class FATImage:
         )
         color_img_path = os.path.join(self.coco_image_directory, image_data['file_name'])
         color_img = cv2.imread(color_img_path)
-        composite, mask_list, rotation_list, centroids_2d = coco_demo.run_on_opencv_image(color_img, use_thresh=use_thresh)
+        composite, mask_list, rotation_list, centroids_2d, boxes, overall_binary_mask \
+                = coco_demo.run_on_opencv_image(color_img, use_thresh=use_thresh)
+
         # depth_img_path = color_img_path.replace('.jpg', '.depth.png')
         depth_img_path = self.get_depth_img_path(color_img_path)
         depth_image = cv2.imread(depth_img_path, cv2.IMREAD_ANYDEPTH)
-        
+        predicted_mask_path = os.path.join(os.path.dirname(depth_img_path), os.path.splitext(os.path.basename(color_img_path))[0] + '.predicted_mask.png')
+        cv2.imwrite(predicted_mask_path, overall_binary_mask)
+
         top_viewpoint_ids = rotation_list['top_viewpoint_ids']
         top_inplane_rotation_ids = rotation_list['top_inplane_rotation_ids']
         labels = rotation_list['labels']
@@ -796,9 +808,13 @@ class FATImage:
 
         print("Predicted top_viewpoint_ids : {}".format(top_viewpoint_ids))
         print("Predicted top_inplane_rotation_ids : {}".format(top_inplane_rotation_ids))
-        print(labels)
+        print("Predicted boxes : {}".format(boxes))
+        print("Predicted labels : {}".format(labels))
+        print("Predicted maks path : {}".format(predicted_mask_path))
         img_list = []
         annotations = []
+        
+        depth_range = []
         if use_thresh == False:
             for i in range(len(top_viewpoint_ids)):
                 viewpoint_id = top_viewpoint_ids[i]
@@ -819,7 +835,13 @@ class FATImage:
             for box_id in range(top_viewpoint_ids.shape[0]):
                 # plt.figure()
                 # plt.imshow(mask_list[box_id])
-                object_depth = np.mean(depth_image[mask_list[box_id] > 0]/self.depth_factor)
+                object_depth_mask = depth_image[mask_list[box_id] > 0]/self.depth_factor
+                object_depth_mask = object_depth_mask.flatten()
+                object_depth_mask = self.reject_outliers(object_depth_mask)
+                object_depth = np.mean(object_depth_mask)
+                min_depth = np.min(object_depth_mask)
+                max_depth = np.max(object_depth_mask)
+                object_rotation_list = []
                 # plt.show()
                 grid[grid_i].imshow(cv2.cvtColor(composite, cv2.COLOR_BGR2RGB))
                 grid[grid_i].scatter(centroids_2d[box_id][0], centroids_2d[box_id][1], s=1)
@@ -858,38 +880,40 @@ class FATImage:
                         grid[grid_i].axis("off")
                         grid_i += 1
                         
-                        annotations.append({
-                            'location' : (centroid_world_point*100).tolist(),
-                            'quaternion_xyzw' : get_xyzw_quaternion(RT_transform.euler2quat(phi, theta, inplane_rotation_angle).tolist()),
-                            'category_id' : self.category_names.index(label),
-                            'id' : grid_i
-                        })
-                        
-                        # location, quat = \
-                        #     self.get_object_pose_with_fixed_transform(
-                        #         label, [centroid[0],centroid[1],object_depth], [phi, theta, inplane_rotation_angle], 'quat')
-                        # location *= 100
-                        # annotations.append({
-                        #     'location' : location.tolist(),
-                        #     'quaternion_xyzw' : quat,
-                        #     'category_id' : self.category_names.index(label),
-                        #     'id' : grid_i
-                        # })
-                # if write_poses:
-                #     pose_rendered_file = os.path.join(
-                #         rendered_dir,
-                #         "poses.txt",
-                #     )
-                #     np.savetxt(pose_rendered_file, np.around(rendered_pose_list_out, 4))
+                        quaternion =  get_xyzw_quaternion(RT_transform.euler2quat(phi, theta, inplane_rotation_angle).tolist())
+                        if use_centroid: 
+                            # Collect final annotations with centroid
+                            annotations.append({
+                                'location' : (centroid_world_point*100).tolist(),
+                                'quaternion_xyzw' : quaternion,
+                                'category_id' : self.category_names.index(label),
+                                'id' : grid_i
+                            })
+                        else :
+                            # Collect rotations only for this object
+                            object_rotation_list.append(quaternion)
 
-        # plt.savefig('model_output.eps', format='eps', dpi=6000)
+                if use_centroid == False:
+                    # Add predicted rotations in depth range
+                    for _, depth in enumerate(np.arange(min_depth, max_depth, 0.02)):
+                        centre_world_point = self.get_world_point(np.array(centroids_2d[box_id].tolist() + [depth]))
+                        for quaternion in object_rotation_list:
+                            annotations.append({
+                                'location' : (centre_world_point*100).tolist(),
+                                'quaternion_xyzw' : quaternion,
+                                'category_id' : self.category_names.index(label),
+                                'id' : grid_i
+                            })
+                            
         model_poses_file = 'model_output_{}.png'.format(self.get_clean_name(image_data['file_name']))
         plt.savefig(
             model_poses_file, 
             dpi=1000, bbox_inches = 'tight', pad_inches = 0
         )
+
+
         # plt.show()
-        return labels, annotations, model_poses_file
+        return labels, annotations, model_poses_file, predicted_mask_path
 
     def compare_clouds(self, annotations_1, annotations_2, f):
         from plyfile import PlyData, PlyElement
@@ -945,16 +969,16 @@ def run_multiple():
     
     # Get Image
     # image_data, annotations = fat_image.get_random_image(name='{}_16k/kitchen_4/000005.left.jpg'.format(category_name))
-    image_data, annotations = fat_image.get_random_image(name='kitchen_4/000003.left.jpg')
+    image_data, annotations = fat_image.get_random_image(name='kitchen_4/000105.left.jpg')
     # fat_image.compare_clouds(annotations, annotations, f)
 
     # Visualize ground truth in ros
-    yaw_only_objects, max_min_dict_gt, transformed_annotations = fat_image.visualize_pose_ros(
-        image_data, annotations, frame='camera', camera_optical_frame=False, num_publish=1, write_poses=False, ros_publish=False
-    )
+    # yaw_only_objects, max_min_dict_gt, transformed_annotations = fat_image.visualize_pose_ros(
+    #     image_data, annotations, frame='camera', camera_optical_frame=False, num_publish=1, write_poses=False, ros_publish=False
+    # )
     
     # Run model to get multiple poses for each object
-    labels, model_annotations, model_poses_file = fat_image.visualize_model_output(image_data, use_thresh=True)
+    labels, model_annotations, model_poses_file, predicted_mask_path = fat_image.visualize_model_output(image_data, use_thresh=True, use_centroid=False)
 
     # Convert model output poses to table frame and save them to file so that they can be read by perch
     _, max_min_dict, _ = fat_image.visualize_pose_ros(
@@ -964,10 +988,11 @@ def run_multiple():
 
     # Run perch on written poses
     perch_annotations = fat_image.visualize_perch_output(
-        image_data, model_annotations, max_min_dict_gt, frame='camera', 
+        image_data, model_annotations, max_min_dict, frame='camera', 
         use_external_render=0, required_object=[labels[0]],
         camera_optical_frame=False, use_external_pose_list=1,
-        model_poses_file=model_poses_file
+        model_poses_file=model_poses_file, use_centroid_shifting=1,
+        predicted_mask_path=predicted_mask_path
     )
 
     # # # Compare Poses by applying to model and computing distance
