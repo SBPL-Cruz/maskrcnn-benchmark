@@ -92,6 +92,8 @@ class FATPerch():
         
     def run_perch_node(self, model_poses_file):
         command = "{}/mpirun -n 4 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
+        print(self.PERCH_EXEC)
+        print("aaaaa")
         print("Running command : {}".format(command))
         # print(subprocess.check_output(command.split(" ")))
         # output = subprocess.check_output(command, shell=True).decode("utf-8")

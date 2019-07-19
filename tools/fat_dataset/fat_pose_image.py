@@ -20,9 +20,9 @@ from lib.pair_matching import RT_transform
 import pcl
 from pprint import pprint
 
-ROS_PYTHON2_PKG_PATH = ['/opt/ros/kinetic/lib/python2.7/dist-packages', '/usr/local/lib/python2.7/dist-packages/']
+ROS_PYTHON2_PKG_PATH = ['/opt/ros/kinetic/lib/python2.7/dist-packages', '/usr/local/lib/python2.7/dist-packages/','/home/jessyxie/catkin_ws/devel/lib/python2.7/dist-packages','/home/jessyxie/perch/devel/lib/python2.7/dist-packages']
 # ROS_PYTHON3_PKG_PATH = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/ros_python3_ws/install/lib/python3/dist-packages'
-ROS_PYTHON3_PKG_PATH = '/home/jessy/projects/ros_python3_ws/install/lib/python3/dist-packages'
+ROS_PYTHON3_PKG_PATH = '/home/jessy/ros_python3_ws/install/lib/python3/dist-packages'
 
 class FATImage:
     def __init__(self, coco_annotation_file=None, coco_image_directory=None, depth_factor=1000):
@@ -54,7 +54,7 @@ class FATImage:
         self.world_to_fat_world = {}
         self.world_to_fat_world['location'] = [0,0,0]
         self.world_to_fat_world['quaternion_xyzw'] = [0.853, -0.147, -0.351, -0.357]
-        self.model_dir = "/home/jessy/projects/dataset/YCB_Video_Dataset"
+        self.model_dir = "/media/jessyxie/47485121-dd80-40e2-9341-77bdc9873731/dataset"
         self.rendered_root_dir = os.path.join(self.model_dir, "rendered")
         mkdir_if_missing(self.rendered_root_dir)
 
@@ -655,10 +655,13 @@ class FATImage:
         # Get camera pose for PERCH and rendering objects if needed
         if frame == 'fat_world':
             camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], None, 'rot', cam_to_body=cam_to_body)
+            camera_pose[:3, 3] /= 100
         if frame == 'world':
             camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], self.world_to_fat_world, 'rot', cam_to_body=cam_to_body)
+            camera_pose[:3, 3] /= 100
         if frame == 'table':
             _, _, camera_pose = self.get_camera_pose_relative_table(depth_img_path, type='rot', cam_to_body=cam_to_body)
+            camera_pose[:3, 3] /= 100
         if frame == 'camera':
             camera_pose = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
             if cam_to_body is not None:
@@ -755,7 +758,7 @@ class FATImage:
             sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
         import cv2
 
-        cfg_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/configs/fat_pose/e2e_mask_rcnn_R_50_FPN_1x_test_cocostyle.yaml'
+        cfg_file = '/home/jessyxie/perch/src/maskrcnn-benchmark/configs/fat_pose/e2e_mask_rcnn_R_50_FPN_1x_test_cocostyle.yaml'
         args = {
             'config_file' : cfg_file,
             'confidence_threshold' : 0.7,
@@ -926,7 +929,6 @@ class FATImage:
         for i in range(len(annotations_1)):
             annotation_1 = annotations_1[i]
             annotation_2 = annotations_2[i]
-
             object_name = self.category_names[annotation_1['category_id']]
 
             file_path = os.path.join(self.model_dir, "models", object_name, "textured.ply")
@@ -1048,9 +1050,9 @@ if __name__ == '__main__':
     #     fat_image.render_perch_poses(max_min_dict, required_object, None, render_dir=rendered_root_dir)
 
     ## Running on PERCH only with synthetic color dataset
-    image_directory = '/home/jessy/projects/dataset/Zed'
-    annotation_file = '/home/jessy/projects/dataset/Zed/instances_fat_val_pose_2018.json'
-    fat_image = FATImage(coco_annotation_file=annotation_file, coco_image_directory=image_directory, depth_factor=25.5)
+    image_directory = '/media/jessyxie/47485121-dd80-40e2-9341-77bdc9873731/dataset/Zed'
+    annotation_file = '/media/jessyxie/47485121-dd80-40e2-9341-77bdc9873731/dataset/Zed/instances_fat_val_pose_2018.json'
+    fat_image = FATImage(coco_annotation_file=annotation_file, coco_image_directory=image_directory, depth_factor=100)
     image_data, annotations = fat_image.get_random_image(name='NewMap1_reduced_2/000000.left.png')
     yaw_only_objects, max_min_dict, _ = fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
     fat_image.visualize_perch_output(
