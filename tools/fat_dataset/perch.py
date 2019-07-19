@@ -12,7 +12,7 @@ from shutil import copy
 
 class FATPerch():
     # Runs perch on single image
-    MPI_BIN_ROOT = "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/openmpi-4.0.0/install/bin"
+    MPI_BIN_ROOT = "/usr/bin"
     # OUTPUT_POSES_FILE = 'output_perch_poses.txt'
     # OUTPUT_STATS_FILE = 'output_perch_stats.txt'
 
