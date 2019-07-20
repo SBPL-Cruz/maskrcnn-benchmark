@@ -24,7 +24,12 @@ import pcl
 from pprint import pprint
 
 class FATImage:
-    def __init__(self, coco_annotation_file=None, coco_image_directory=None, depth_factor=1000):
+    def __init__(self, 
+            coco_annotation_file=None, coco_image_directory=None, 
+            depth_factor=1000, 
+            model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/'
+        ):
+
         self.coco_image_directory = coco_image_directory
         self.example_coco = COCO(coco_annotation_file)
         example_coco = self.example_coco
@@ -53,7 +58,7 @@ class FATImage:
         self.world_to_fat_world = {}
         self.world_to_fat_world['location'] = [0,0,0]
         self.world_to_fat_world['quaternion_xyzw'] = [0.853, -0.147, -0.351, -0.357]
-        self.model_dir = "/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/"
+        self.model_dir = model_dir
         self.rendered_root_dir = os.path.join(self.model_dir, "rendered")
         mkdir_if_missing(self.rendered_root_dir)
 
@@ -509,6 +514,10 @@ class FATImage:
         max_min_dict['ymin'] -= 0.10
         max_min_dict['xmax'] += 0.10
         max_min_dict['xmin'] -= 0.10
+        # max_min_dict['ymax'] = 2.00
+        # max_min_dict['ymin'] = -2.00
+        # max_min_dict['xmax'] = 2.00
+        # max_min_dict['xmin'] = -2.00
         # max_min_dict['zmin'] = table_pose_msg.pose.position.z
         print("Yaw only objects in the image : {}".format(yaw_only_objects))
 
@@ -653,10 +662,14 @@ class FATImage:
         # Get camera pose for PERCH and rendering objects if needed
         if frame == 'fat_world':
             camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], None, 'rot', cam_to_body=cam_to_body)
+            camera_pose[:3, 3] /= 100 
         if frame == 'world':
             camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], self.world_to_fat_world, 'rot', cam_to_body=cam_to_body)
+            camera_pose[:3, 3] /= 100 
         if frame == 'table':
             _, _, camera_pose = self.get_camera_pose_relative_table(depth_img_path, type='rot', cam_to_body=cam_to_body)
+            camera_pose[:3, 3] /= 100 
+            
         if frame == 'camera':
             camera_pose = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
             if cam_to_body is not None:
@@ -695,7 +708,7 @@ class FATImage:
             # 'y_max' : max_min_dict['ymin'] + 2 * self.search_resolution_translation,
             'required_object' : required_object,
             # 'table_height' :  max_min_dict['zmin'],
-            'table_height' :  0.030,
+            'table_height' :  0.010,
             'use_external_render' : use_external_render, 
             'camera_pose': camera_pose,
             'reference_frame_': frame,
@@ -969,7 +982,25 @@ def run_multiple():
     
     # Get Image
     # image_data, annotations = fat_image.get_random_image(name='{}_16k/kitchen_4/000005.left.jpg'.format(category_name))
-    image_data, annotations = fat_image.get_random_image(name='kitchen_4/000105.left.jpg')
+    image_data, annotations = fat_image.get_random_image(name='kitchen_4/000015.left.jpg')
+
+    # Look at for labels 0 and 1
+    # can be improved by further restricted segmentation mask
+    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000040.left.jpg')
+    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000060.left.jpg')
+    # wrong localization for soup can
+    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000070.left.jpg')
+    # can try with all possible combinations
+    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000100.left.jpg')
+    # Box doesnt look right in this
+    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000005.left.jpg')
+    # 
+
+    # TODO
+    # restrict segmentation
+    # move in x,y in hypothesis
+    # try all possible combinations of rotation and viewpoint, increase topk number
+
     # fat_image.compare_clouds(annotations, annotations, f)
 
     # Visualize ground truth in ros
@@ -989,7 +1020,7 @@ def run_multiple():
     # Run perch on written poses
     perch_annotations = fat_image.visualize_perch_output(
         image_data, model_annotations, max_min_dict, frame='camera', 
-        use_external_render=0, required_object=[labels[0]],
+        use_external_render=0, required_object=[labels[0], labels[1]],
         camera_optical_frame=False, use_external_pose_list=1,
         model_poses_file=model_poses_file, use_centroid_shifting=1,
         predicted_mask_path=predicted_mask_path
@@ -1042,20 +1073,42 @@ if __name__ == '__main__':
     # for required_object in fat_image.category_names:
     #     fat_image.render_perch_poses(max_min_dict, required_object, None, render_dir=rendered_root_dir)
 
-    ## Running on PERCH only with synthetic color dataset
+    ## Running on PERCH only with synthetic color dataset - YCB
+    # Use normalize cost to get best results
     # image_directory = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
     # annotation_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed/instances_fat_val_pose_2018.json'
-    # fat_image = FATImage(coco_annotation_file=annotation_file, coco_image_directory=image_directory, depth_factor=25.5)
+    # fat_image = FATImage(coco_annotation_file=annotation_file, coco_image_directory=image_directory, depth_factor=100)
     # image_data, annotations = fat_image.get_random_image(name='NewMap1_reduced_2/000000.left.png')
     # yaw_only_objects, max_min_dict, _ = fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
     # fat_image.visualize_perch_output(
     #     image_data, annotations, max_min_dict, frame='table', 
-    #     use_external_render=0, required_object=['008_pudding_box', '010_potted_meat_can'],
+    #     use_external_render=0, required_object=['008_pudding_box', '010_potted_meat_can', '009_gelatin_box'],
+    #     # use_external_render=0, required_object=['008_pudding_box', '010_potted_meat_can', '009_gelatin_box'],
     #     # use_external_render=0, required_object=['009_gelatin_box', '008_pudding_box', '010_potted_meat_can', '004_sugar_box'],
     #     # use_external_render=0, required_object=['004_sugar_box', '036_wood_block', '009_gelatin_box', '008_pudding_box', '010_potted_meat_can'],
     #     # use_external_render=0, required_object=['009_gelatin_box', '008_pudding_box', '010_potted_meat_can'],
     #     camera_optical_frame=False, use_external_pose_list=0
     # )
 
+    ## Running on PERCH only with synthetic color dataset - shape
+    # Use normalize cost to get best results
+    image_directory = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
+    annotation_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed/instances_fat_val_pose_2018.json'
+    fat_image = FATImage(
+        coco_annotation_file=annotation_file, coco_image_directory=image_directory, depth_factor=100, model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/SameShape/'
+    )
+    image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000000.left.png')
+    yaw_only_objects, max_min_dict, _ = fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
+    fat_image.visualize_perch_output(
+        image_data, annotations, max_min_dict, frame='table', 
+        use_external_render=0, required_object=['coke', 'sprite', 'pepsi'],
+        # use_external_render=0, required_object=['008_pudding_box', '010_potted_meat_can', '009_gelatin_box'],
+        # use_external_render=0, required_object=['009_gelatin_box', '008_pudding_box', '010_potted_meat_can', '004_sugar_box'],
+        # use_external_render=0, required_object=['004_sugar_box', '036_wood_block', '009_gelatin_box', '008_pudding_box', '010_potted_meat_can'],
+        # use_external_render=0, required_object=['009_gelatin_box', '008_pudding_box', '010_potted_meat_can'],
+        camera_optical_frame=False, use_external_pose_list=0
+    )
+
     ## Run Perch with Model
-    run_multiple()
+    # Dont use normalize cost and run with shifting centroid
+    # run_multiple()

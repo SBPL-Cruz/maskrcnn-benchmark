@@ -94,7 +94,7 @@ if False:
 
 if True:
     ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
-    SCENES = [ "NewMap1_reduced_2" ]
+    SCENES = [ "NewMap1_soda_cans" ]
 
     object_settings_file = Path(os.path.join(ROOT_DIR, SCENES[0], "_object_settings.json"))
     camera_settings_file = Path(os.path.join(ROOT_DIR, SCENES[0], "_camera_settings.json"))

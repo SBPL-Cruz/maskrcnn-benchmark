@@ -23,6 +23,9 @@ class FATPerch():
         "008_pudding_box" : 1,
         "009_gelatin_box" : 1,
         "010_potted_meat_can" : 1,
+        "pepsi" : 2,
+        "coke" : 2,
+        "sprite" : 2
     }
 
     def __init__(
@@ -76,7 +79,7 @@ class FATPerch():
 
     def set_object_model_params(self, object_names, models_root):
         self.set_ros_param('mesh_in_mm', False)
-
+        # object_names.append('004_sugar_box')
         params = []
         for object_name in object_names:
             params.append([
