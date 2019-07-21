@@ -20,7 +20,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from pycocotools.coco import COCO
 import pylab
-from pyquaternion import Quaternion
+# from pyquaternion import Quaternion
 from transformations import euler_from_matrix
 import math
 from sphere_fibonacci_grid_points import sphere_fibonacci_grid_points

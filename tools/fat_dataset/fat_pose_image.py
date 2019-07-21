@@ -3,17 +3,14 @@ import matplotlib.pylab as pylab
 import os
 from PIL import Image
 import numpy as np
-import torch
+# import torch
 import json
 import sys
 from tqdm import tqdm, trange
 
-
-from maskrcnn_benchmark.config import cfg
 from pycocotools.coco import COCO
 import skimage.io as io
 import pylab
-from dipy.core.geometry import cart2sphere, sphere2cart
 from convert_fat_coco import *
 from mpl_toolkits.axes_grid1 import ImageGrid
 
@@ -22,6 +19,10 @@ from lib.render_glumpy.render_py import Render_Py
 from lib.pair_matching import RT_transform
 import pcl
 from pprint import pprint
+
+ROS_PYTHON2_PKG_PATH = ['/opt/ros/kinetic/lib/python2.7/dist-packages', '/usr/local/lib/python2.7/dist-packages/']
+ROS_PYTHON3_PKG_PATH = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/ros_python3_ws/install/lib/python3/dist-packages'
+# ROS_PYTHON3_PKG_PATH = '/home/jessy/projects/ros_python3_ws/install/lib/python3/dist-packages'
 
 class FATImage:
     def __init__(self, 
@@ -387,10 +388,11 @@ class FATImage:
         import rosparam
         from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Quaternion
         from sensor_msgs.msg import Image, PointCloud2
-        if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
-            sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-        if '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/ros_python3_ws/install/lib/python3/dist-packages' not in sys.path:
-            sys.path.append('/media/aditya/A69AFABA9AFA85D9/Cruzr/code/ros_python3_ws/install/lib/python3/dist-packages')
+        for python2_path in ROS_PYTHON2_PKG_PATH:
+            if python2_path in sys.path:
+                sys.path.remove(python2_path)
+        if ROS_PYTHON3_PKG_PATH not in sys.path:
+            sys.path.append(ROS_PYTHON3_PKG_PATH)
         # These packages need to be python3 specific, cv2 is imported from environment, cv_bridge is built using python3
         import cv2
         from cv_bridge import CvBridge, CvBridgeError
@@ -758,6 +760,9 @@ class FATImage:
         return data[s<m]
 
     def visualize_model_output(self, image_data, use_thresh=False, use_centroid=True):
+
+        from maskrcnn_benchmark.config import cfg
+        from dipy.core.geometry import cart2sphere, sphere2cart
         # plt.figure()
         # img_path = os.path.join(image_directory, image_data['file_name'])
         # image = io.imread(img_path)
