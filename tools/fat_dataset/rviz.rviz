@@ -15,8 +15,8 @@ Panels:
         - /PointCloud22
         - /PointCloud22/Status1
         - /Marker1
-        - /PointCloud23
         - /PointCloud23/Status1
+        - /PoseArray2
       Splitter Ratio: 0.5
     Tree Height: 165
   - Class: rviz/Selection
@@ -265,7 +265,7 @@ Visualization Manager:
       Marker Topic: /perch_fat_experiments/perch_marker_array
       Name: MarkerArray
       Namespaces:
-        {}
+        perch: true
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -288,7 +288,7 @@ Visualization Manager:
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: camera
+    Fixed Frame: table
     Frame Rate: 30
   Name: root
   Tools:
@@ -309,25 +309,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.86707926
+      Distance: 2.32807231
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.0354090035
-        Y: -0.0602276251
-        Z: 0.557131112
+        X: -0.0169319715
+        Y: -0.0330955945
+        Z: 0.142818823
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: -1.56979632
+      Pitch: 0.430204988
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.68870926
+      Yaw: 3.65565658
     Saved:
       - Class: rviz/Orbit
         Distance: 1.5690062

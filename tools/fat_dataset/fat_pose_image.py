@@ -27,7 +27,9 @@ class FATImage:
     def __init__(self, 
             coco_annotation_file=None, coco_image_directory=None, 
             depth_factor=1000, 
-            model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/'
+            model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/',
+            model_mesh_in_mm=False,
+            model_mesh_scaling_factor=1
         ):
 
         self.coco_image_directory = coco_image_directory
@@ -59,6 +61,10 @@ class FATImage:
         self.world_to_fat_world['location'] = [0,0,0]
         self.world_to_fat_world['quaternion_xyzw'] = [0.853, -0.147, -0.351, -0.357]
         self.model_dir = model_dir
+        self.model_params = {
+            'mesh_in_mm' : model_mesh_in_mm,
+            'mesh_scaling_factor' : model_mesh_scaling_factor
+        }
         self.rendered_root_dir = os.path.join(self.model_dir, "rendered")
         mkdir_if_missing(self.rendered_root_dir)
 
@@ -736,7 +742,8 @@ class FATImage:
             camera_params=camera_params,
             object_names=self.category_names,
             output_dir_name=self.get_clean_name(image_data['file_name']),
-            models_root=models_root
+            models_root=models_root,
+            model_params=self.model_params
         )
         perch_annotations = fat_perch.run_perch_node(model_poses_file)
         return perch_annotations
@@ -1093,19 +1100,25 @@ if __name__ == '__main__':
     ## Running on PERCH only with synthetic color dataset - shape
     # Use normalize cost to get best results
     image_directory = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
-    annotation_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed/instances_fat_val_pose_2018.json'
+    annotation_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed/instances_soda_val_pose_2018.json'
     fat_image = FATImage(
-        coco_annotation_file=annotation_file, coco_image_directory=image_directory, depth_factor=100, model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/SameShape/'
+        coco_annotation_file=annotation_file, 
+        coco_image_directory=image_directory, 
+        depth_factor=100, 
+        model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/SameShape/',
+        model_mesh_in_mm=True,
+        model_mesh_scaling_factor=0.0275
     )
-    image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000000.left.png')
+    image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000048.left.png')
     yaw_only_objects, max_min_dict, _ = fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
+    max_min_dict['ymax'] = 1.5
+    max_min_dict['ymin'] = -1.5
+    max_min_dict['xmax'] = 0.5
+    max_min_dict['xmin'] = -0.5
     fat_image.visualize_perch_output(
         image_data, annotations, max_min_dict, frame='table', 
+        # use_external_render=0, required_object=['coke'],
         use_external_render=0, required_object=['coke', 'sprite', 'pepsi'],
-        # use_external_render=0, required_object=['008_pudding_box', '010_potted_meat_can', '009_gelatin_box'],
-        # use_external_render=0, required_object=['009_gelatin_box', '008_pudding_box', '010_potted_meat_can', '004_sugar_box'],
-        # use_external_render=0, required_object=['004_sugar_box', '036_wood_block', '009_gelatin_box', '008_pudding_box', '010_potted_meat_can'],
-        # use_external_render=0, required_object=['009_gelatin_box', '008_pudding_box', '010_potted_meat_can'],
         camera_optical_frame=False, use_external_pose_list=0
     )
 

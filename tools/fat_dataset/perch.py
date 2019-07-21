@@ -30,7 +30,7 @@ class FATPerch():
 
     def __init__(
             self, params=None, input_image_files=None, camera_params=None, object_names=None, output_dir_name=None,
-            models_root=None
+            models_root=None, model_params=None
         ):
         self.PERCH_EXEC = subprocess.check_output("catkin_find sbpl_perception perch_fat".split(" ")).decode("utf-8").rstrip().lstrip()
         rospack = rospkg.RosPack()
@@ -53,7 +53,7 @@ class FATPerch():
         
         self.set_ros_param_from_dict(input_image_files)
         self.set_ros_param_from_dict(camera_params)
-        self.set_object_model_params(object_names, models_root)
+        self.set_object_model_params(object_names, models_root, model_params)
         self.output_dir_name = output_dir_name
         # self.launch_ros_node(PERCH_YCB_OBJECTS)
         # self.run_perch_node(PERCH_EXEC)
@@ -77,15 +77,20 @@ class FATPerch():
         print(command)
         subprocess.call(command, shell=True)
 
-    def set_object_model_params(self, object_names, models_root):
-        self.set_ros_param('mesh_in_mm', False)
+    def set_object_model_params(self, object_names, models_root, model_params):
+        self.set_ros_param_from_dict(model_params)
+        # self.set_ros_param('mesh_in_mm', True)
+        # self.set_ros_param('mesh_scaling_factor', 0.0275)
         # object_names.append('004_sugar_box')
         params = []
+        #flipped
+        #symmetric true false
+        #symmetric number
         for object_name in object_names:
             params.append([
                 object_name,
                 os.path.join(models_root, object_name, 'textured.ply'),
-                False,
+                True,
                 False,
                 0 if self.use_external_pose_list == 1 else self.SYMMETRY_INFO[object_name],
                 0.06,
