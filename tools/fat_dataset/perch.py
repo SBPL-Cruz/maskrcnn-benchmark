@@ -12,7 +12,8 @@ from shutil import copy
 
 class FATPerch():
     # Runs perch on single image
-    MPI_BIN_ROOT = "/usr/bin"
+    # MPI_BIN_ROOT = "/usr/bin"
+    MPI_BIN_ROOT = "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/openmpi-4.0.0/install/bin"
     # OUTPUT_POSES_FILE = 'output_perch_poses.txt'
     # OUTPUT_STATS_FILE = 'output_perch_stats.txt'
 
@@ -90,7 +91,7 @@ class FATPerch():
             params.append([
                 object_name,
                 os.path.join(models_root, object_name, 'textured.ply'),
-                True,
+                model_params['flipped'],
                 False,
                 0 if self.use_external_pose_list == 1 else self.SYMMETRY_INFO[object_name],
                 0.06,
