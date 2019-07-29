@@ -125,7 +125,16 @@ class FATPerch():
                             'id' : i
                         })
         f.close()
+
+        f = open(os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name, 'output_stats.txt'), "r")
+        stats = {}
+        lines = f.readlines()
+        stats_from_file = list(map(float, lines[2].rstrip().split()))
+        stats['expands'] = stats_from_file[2]
+        stats['runtime'] = stats_from_file[3]
+        f.close()
+
         if model_poses_file is not None:
             copy(model_poses_file, os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name))
-        return annotations
+        return annotations, stats
 

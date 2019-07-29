@@ -103,13 +103,13 @@ class FATImage:
         annotations = self.example_coco.loadAnns(annotation_ids)
         self.example_coco.showAnns(annotations)
         # print(annotations)
-        if required_objects is not None:
-            filtered_annotations = []
-            for annotation in annotations:
-                class_name = self.categories[annotation['category_id']]['name']
-                if class_name in required_objects:
-                    filtered_annotations.append(annotation)
-            return image_data, filtered_annotations
+        # if required_objects is not None:
+        #     filtered_annotations = []
+        #     for annotation in annotations:
+        #         class_name = self.categories[annotation['category_id']]['name']
+        #         if class_name in required_objects:
+        #             filtered_annotations.append(annotation)
+        #     return image_data, filtered_annotations
 
         return image_data, annotations
     
@@ -566,10 +566,6 @@ class FATImage:
         object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1],rotation_angles[2])
         object_world_transform[:,3] = [i/100 for i in location] + [1]
 
-        # object_world_transform[0,0] *= 0.0275
-        # object_world_transform[1,1] *= 0.0275
-        # object_world_transform[2,2] *= 0.0275
-
         if use_fixed_transform:
             fixed_transform = np.transpose(np.array(self.fixed_transforms_dict[class_name]))
             fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
@@ -984,9 +980,20 @@ class FATImage:
                 object_name, annotation_1['location'], RT_transform.quat2euler(get_wxyz_quaternion(annotation_1['quaternion_xyzw'])), 'rot',
                 use_fixed_transform=False
             )
+            # scaling_transform = np.zeros((4,4))
+            # scaling_transform[3,3] = 1
+            # scaling_transform[0,0] = 0.0275
+            # scaling_transform[1,1] = 0.0275
+            # scaling_transform[2,2] = 0.0275
+            # total_transform_1 =  scaling_transform * total_transform_1
+            # print(total_transform_1)
             # transformed_cloud_1 = np.matmul(total_transform_1, np.transpose(cloud))
             transformed_cloud_1 = np.matmul(cloud, total_transform_1)
-            print(transformed_cloud_1)
+            # print(transformed_cloud_1)
+
+            l = transformed_cloud_1[:,3]
+            # transformed_cloud_1 = np.divide(transformed_cloud_1[:,:3], transformed_cloud_1[:,3])
+            transformed_cloud_1 = transformed_cloud_1[:,:3]/l[:, np.newaxis]
 
             total_transform_2 = self.get_object_pose_with_fixed_transform(
                 object_name, annotation_2['location'], RT_transform.quat2euler(get_wxyz_quaternion(annotation_2['quaternion_xyzw'])), 'rot',
@@ -994,8 +1001,15 @@ class FATImage:
             )
             # transformed_cloud_2 = np.matmul(total_transform_2, np.transpose(cloud))
             transformed_cloud_2 = np.matmul(cloud, total_transform_2)
-            mean_dist = np.linalg.norm(transformed_cloud_1-transformed_cloud_2)/cloud.shape[0]
-            print("Average pose distance : {}".format(mean_dist))
+            l = transformed_cloud_2[:,3]
+            transformed_cloud_2 = transformed_cloud_2[:,:3]/l[:, np.newaxis]
+            # print(transformed_cloud_2)
+
+            mean_dist = np.linalg.norm(transformed_cloud_1-transformed_cloud_2, axis=1)
+            mean_dist = np.sum(mean_dist)/cloud.shape[0]
+            # print(mean_dist)
+            #/cloud.shape[0]
+            print("Average pose distance (in m) : {}".format(mean_dist))
             f.write("{} {}\n".format(object_name, mean_dist))
 
 
@@ -1148,10 +1162,13 @@ if __name__ == '__main__':
     # image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000033.left.png')
     # image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000038.left.png')
     # image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000048.left.png')
-    # for img_i in [33, 38, 48]:
-    for img_i in ['12']:
-        required_objects = ['sprite']
-        image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/0000{}.left.png'.format(img_i), required_objects=required_objects)
+    f_runtime = open('runtime.txt', "w")
+    f_runtime.write("{} {} {}\n".format('name', 'expands', 'runtime'))
+    for img_i in ['14', '20', '25', '33', '38', '48']:
+    # for img_i in ['25']:
+        required_objects = ['sprite', 'coke', 'pepsi']
+        image_name = 'NewMap1_soda_cans/0000{}.left.png'.format(img_i)
+        image_data, annotations = fat_image.get_random_image(name=image_name, required_objects=required_objects)
         yaw_only_objects, max_min_dict, transformed_annotations = \
             fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
         max_min_dict['ymax'] = 1.5
@@ -1159,19 +1176,20 @@ if __name__ == '__main__':
         max_min_dict['xmax'] = 0.5
         max_min_dict['xmin'] = -0.5
         fat_image.search_resolution_translation = 0.05
-        perch_annotations = fat_image.visualize_perch_output(
+        perch_annotations, stats = fat_image.visualize_perch_output(
             image_data, annotations, max_min_dict, frame='table', 
-            use_external_render=0, required_object=['coke'],
+            use_external_render=0, required_object=required_objects,
             # use_external_render=0, required_object=['coke', 'sprite', 'pepsi'],
             # use_external_render=0, required_object=['sprite', 'coke', 'pepsi'],
             camera_optical_frame=False, use_external_pose_list=0
         )
-        f = open('accuracy.txt', "w")
-        f.write("{} ".format(image_data['file_name']))
-        print(annotations)
-        print(transformed_annotations)
-        fat_image.compare_clouds(transformed_annotations, perch_annotations, f)
-        f.close()
+        # f = open('accuracy.txt', "w")
+        # f.write("{} ".format(image_data['file_name']))
+        # print(transformed_annotations)
+        # fat_image.compare_clouds(transformed_annotations, perch_annotations, f)
+        # f.close()
+        f_runtime.write("{} {} {}\n".format(image_name, stats['expands'], stats['runtime']))
+    f_runtime.close()
 
     ## Run Perch with Model
     # Dont use normalize cost and run with shifting centroid
