@@ -103,13 +103,13 @@ class FATImage:
         annotations = self.example_coco.loadAnns(annotation_ids)
         self.example_coco.showAnns(annotations)
         # print(annotations)
-        # if required_objects is not None:
-        #     filtered_annotations = []
-        #     for annotation in annotations:
-        #         class_name = self.categories[annotation['category_id']]['name']
-        #         if class_name in required_objects:
-        #             filtered_annotations.append(annotation)
-        #     return image_data, filtered_annotations
+        if required_objects is not None:
+            filtered_annotations = []
+            for annotation in annotations:
+                class_name = self.categories[annotation['category_id']]['name']
+                if class_name in required_objects:
+                    filtered_annotations.append(annotation)
+            return image_data, filtered_annotations
 
         return image_data, annotations
     
@@ -671,7 +671,8 @@ class FATImage:
 
     def visualize_perch_output(self, image_data, annotations, max_min_dict, frame='fat_world', 
             use_external_render=0, required_object='004_sugar_box', camera_optical_frame=True,
-            use_external_pose_list=0, model_poses_file=None, use_centroid_shifting=0, predicted_mask_path=None
+            use_external_pose_list=0, model_poses_file=None, use_centroid_shifting=0, predicted_mask_path=None,
+            gt_annotations=None
         ):
         from perch import FATPerch
         print("camera instrinsics : {}".format(self.camera_intrinsics))
@@ -955,12 +956,12 @@ class FATImage:
         # plt.show()
         return labels, annotations, model_poses_file, predicted_mask_path
 
-    def compare_clouds(self, annotations_1, annotations_2, f):
+    def compare_clouds(self, annotations_1, annotations_2):
         from plyfile import PlyData, PlyElement
-
+        result_dict = {}
         for i in range(len(annotations_1)):
             annotation_1 = annotations_1[i]
-            annotation_2 = annotations_2[i]
+            annotation_2 = [annotations_2[j] for j in range(len(annotations_2)) if annotation_1['category_id'] == annotations_2[j]['category_id']][0]
 
             object_name = self.category_names[annotation_1['category_id']]
 
@@ -973,8 +974,17 @@ class FATImage:
             # cloud = np.asarray(cloud)
             cloud = np.hstack((cloud, np.ones((cloud.shape[0], 1))))
             # print(cloud)
-            print("Locations : {}, {}".format(annotation_1['location'], annotation_2['location']))
-            print("Quaternions : {}, {}".format(annotation_1['quaternion_xyzw'], annotation_2['quaternion_xyzw']))
+
+            annotation_1_cat = self.categories[annotation_1['category_id']]['name']
+            annotation_2_cat = self.categories[annotation_2['category_id']]['name']
+
+
+            print("Locations {} {}: {}, {}".format(
+                annotation_1_cat, annotation_2_cat, annotation_1['location'], annotation_2['location'])
+            )
+            print("Quaternions {} {}: {}, {}".format(
+                annotation_1_cat, annotation_2_cat, annotation_1['quaternion_xyzw'], annotation_2['quaternion_xyzw'])
+            )
 
             total_transform_1 = self.get_object_pose_with_fixed_transform(
                 object_name, annotation_1['location'], RT_transform.quat2euler(get_wxyz_quaternion(annotation_1['quaternion_xyzw'])), 'rot',
@@ -985,7 +995,13 @@ class FATImage:
             # scaling_transform[0,0] = 0.0275
             # scaling_transform[1,1] = 0.0275
             # scaling_transform[2,2] = 0.0275
-            # total_transform_1 =  scaling_transform * total_transform_1
+            # scaling_transform_flip = np.copy(scaling_transform)
+            # scaling_transform_flip[2,2] = -0.0275
+            # total_transform_1 =  np.matmul(total_transform_1, scaling_transform_flip)
+
+            scaling_transform = annotation_2['preprocessing_transform_matrix']
+            scaling_transform[2,3] = 0
+            total_transform_1 =  np.matmul(total_transform_1, scaling_transform)
             # print(total_transform_1)
             # transformed_cloud_1 = np.matmul(total_transform_1, np.transpose(cloud))
             transformed_cloud_1 = np.matmul(cloud, total_transform_1)
@@ -995,22 +1011,28 @@ class FATImage:
             # transformed_cloud_1 = np.divide(transformed_cloud_1[:,:3], transformed_cloud_1[:,3])
             transformed_cloud_1 = transformed_cloud_1[:,:3]/l[:, np.newaxis]
 
-            total_transform_2 = self.get_object_pose_with_fixed_transform(
-                object_name, annotation_2['location'], RT_transform.quat2euler(get_wxyz_quaternion(annotation_2['quaternion_xyzw'])), 'rot',
-                use_fixed_transform=False
-            )
-            # transformed_cloud_2 = np.matmul(total_transform_2, np.transpose(cloud))
+            # total_transform_2 = self.get_object_pose_with_fixed_transform(
+            #     object_name, annotation_2['location'], RT_transform.quat2euler(get_wxyz_quaternion(annotation_2['quaternion_xyzw'])), 'rot',
+            #     use_fixed_transform=False
+            # )
+            # total_transform_2 =  np.matmul(total_transform_2, scaling_transform)
+            # # transformed_cloud_2 = np.matmul(total_transform_2, np.transpose(cloud))
+            total_transform_2 = annotation_2['transform_matrix']
+
             transformed_cloud_2 = np.matmul(cloud, total_transform_2)
             l = transformed_cloud_2[:,3]
             transformed_cloud_2 = transformed_cloud_2[:,:3]/l[:, np.newaxis]
-            # print(transformed_cloud_2)
+            print(transformed_cloud_2)
 
             mean_dist = np.linalg.norm(transformed_cloud_1-transformed_cloud_2, axis=1)
             mean_dist = np.sum(mean_dist)/cloud.shape[0]
             # print(mean_dist)
             #/cloud.shape[0]
             print("Average pose distance (in m) : {}".format(mean_dist))
-            f.write("{} {}\n".format(object_name, mean_dist))
+            result_dict[object_name] = mean_dist
+
+        return result_dict
+            # f.write("{} {}\n".format(object_name, mean_dist))
 
 
 
@@ -1078,7 +1100,7 @@ def run_multiple():
     )
 
     # # # Compare Poses by applying to model and computing distance
-    f.write("{} ".format(image_data['file_name']))
+    f.write("{}\n".format(image_data['file_name']))
     fat_image.compare_clouds(transformed_annotations, perch_annotations, f)
 
 
@@ -1113,7 +1135,7 @@ if __name__ == '__main__':
     #     # use_external_render=0, required_object=['007_tuna_fish_can'],
     #     camera_optical_frame=False
     # )
-    # fat_image.save_yaw_only_dataset(scene="kitchen_0")
+    # fat_image.save_yaw_only_dataset(scene="kitchen_0")fv
 
 
     ## Analyze object rotations about various axis
@@ -1154,42 +1176,54 @@ if __name__ == '__main__':
         model_mesh_scaling_factor=0.0275,
         models_flipped=True
     )
-    # below doesnt work for any method
-    # image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000014.left.png')
 
-    # image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000000.left.png')
-    # image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000001.left.png')
-    # image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000033.left.png')
-    # image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000038.left.png')
-    # image_data, annotations = fat_image.get_random_image(name='NewMap1_soda_cans/000048.left.png')
     f_runtime = open('runtime.txt', "w")
+    f_accuracy = open('accuracy.txt', "w")
     f_runtime.write("{} {} {}\n".format('name', 'expands', 'runtime'))
-    for img_i in ['14', '20', '25', '33', '38', '48']:
+    
+    required_objects = ['sprite', 'coke', 'pepsi']
+    f_accuracy.write("name ")
+    for object_name in required_objects:
+        f_accuracy.write("{} ".format(object_name)) 
+    f_accuracy.write("\n")
+
+    for img_i in ['00', '01', '10']:
+    # for img_i in ['14', '20', '25', '33', '38', '48']:
     # for img_i in ['25']:
-        required_objects = ['sprite', 'coke', 'pepsi']
+        
+        # required_objects = ['coke']
         image_name = 'NewMap1_soda_cans/0000{}.left.png'.format(img_i)
         image_data, annotations = fat_image.get_random_image(name=image_name, required_objects=required_objects)
+        
         yaw_only_objects, max_min_dict, transformed_annotations = \
             fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
+
         max_min_dict['ymax'] = 1.5
         max_min_dict['ymin'] = -1.5
         max_min_dict['xmax'] = 0.5
         max_min_dict['xmin'] = -0.5
         fat_image.search_resolution_translation = 0.05
+
         perch_annotations, stats = fat_image.visualize_perch_output(
             image_data, annotations, max_min_dict, frame='table', 
             use_external_render=0, required_object=required_objects,
             # use_external_render=0, required_object=['coke', 'sprite', 'pepsi'],
             # use_external_render=0, required_object=['sprite', 'coke', 'pepsi'],
-            camera_optical_frame=False, use_external_pose_list=0
+            camera_optical_frame=False, use_external_pose_list=0, gt_annotations=transformed_annotations
         )
-        # f = open('accuracy.txt', "w")
-        # f.write("{} ".format(image_data['file_name']))
+        # print(perch_annotations)
         # print(transformed_annotations)
-        # fat_image.compare_clouds(transformed_annotations, perch_annotations, f)
-        # f.close()
+
+        f_accuracy.write("{} ".format(image_data['file_name']))
+        accuracy_dict = fat_image.compare_clouds(transformed_annotations, perch_annotations)
+        for object_name in required_objects:
+            f_accuracy.write("{} ".format(accuracy_dict[object_name])) 
+        f_accuracy.write("\n")
+
         f_runtime.write("{} {} {}\n".format(image_name, stats['expands'], stats['runtime']))
+
     f_runtime.close()
+    f_accuracy.close()
 
     ## Run Perch with Model
     # Dont use normalize cost and run with shifting centroid

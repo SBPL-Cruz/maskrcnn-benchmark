@@ -116,13 +116,22 @@ class FATPerch():
         annotations = []
         f = open(os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name, 'output_poses.txt'), "r")
         lines = f.readlines()
-        for i in np.arange(0, len(lines), 3):
-            location = list(map(float, lines[i+1].rstrip().split()))
+        for i in np.arange(0, len(lines), 13):
+            location = list(map(float, lines[i+1].rstrip().split()[1:]))
+            quaternion = list(map(float, lines[i+2].rstrip().split()[1:]))
+            transform_matrix = np.zeros((4,4))
+            preprocessing_transform_matrix = np.zeros((4,4))
+            for l_t in range(4, 8) :
+                transform_matrix[l_t - 4,:] = list(map(float, lines[i+l_t].rstrip().split())) 
+            for l_t in range(9, 13) :
+                preprocessing_transform_matrix[l_t - 9,:] = list(map(float, lines[i+l_t].rstrip().split())) 
             annotations.append({
                             'location' : [location[0] * 100, location[1] * 100, location[2] * 100],
-                            'quaternion_xyzw' : list(map(float, lines[i+2].rstrip().split())),
+                            'quaternion_xyzw' : quaternion,
                             'category_id' : self.object_names.index(lines[i].rstrip()),
-                            'id' : i
+                            'transform_matrix' : transform_matrix,
+                            'preprocessing_transform_matrix' : preprocessing_transform_matrix,
+                            'id' : i%13
                         })
         f.close()
 
