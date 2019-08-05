@@ -26,7 +26,14 @@ class FATPerch():
         "010_potted_meat_can" : 1,
         "pepsi" : 2,
         "coke" : 2,
-        "sprite" : 2
+        "sprite" : 2,
+        "pepsi_can" : 2,
+        "coke_can" : 2,
+        "sprite_can" : 2,
+        "coke_bottle" : 2,
+        "sprite_bottle" : 2,
+        "fanta_bottle" : 2,
+        "crate_test" : 1
     }
 
     def __init__(
@@ -100,7 +107,7 @@ class FATPerch():
         self.set_ros_param('model_bank', params)
         
     def run_perch_node(self, model_poses_file):
-        command = "{}/mpirun -n 4 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
+        command = "{}/mpirun --use-hwthread-cpus -n 6 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
         print("Running command : {}".format(command))
         # print(subprocess.check_output(command.split(" ")))
         # output = subprocess.check_output(command, shell=True).decode("utf-8")

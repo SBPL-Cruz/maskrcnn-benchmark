@@ -60,8 +60,9 @@ class FATImage:
         self.depth_factor = depth_factor
 
         self.world_to_fat_world = {}
-        self.world_to_fat_world['location'] = [0,0,0]
-        self.world_to_fat_world['quaternion_xyzw'] = [0.853, -0.147, -0.351, -0.357]
+        self.world_to_fat_world['location'] = [0,0,0.010]
+        # self.world_to_fat_world['quaternion_xyzw'] = [0.853, -0.147, -0.351, -0.357]
+        self.world_to_fat_world['quaternion_xyzw'] = [0,0,0,1]
         self.model_dir = model_dir
         self.model_params = {
             'mesh_in_mm' : model_mesh_in_mm,
@@ -462,6 +463,7 @@ class FATImage:
 
                 if frame == 'table':
                     location, quat = get_object_pose_in_world(annotation, camera_pose_table)
+                    # location, quat = get_object_pose_in_world(annotation, camera_pose_table, self.world_to_fat_world)
                     camera_location, camera_quat = camera_pose_table['location_worldframe'], camera_pose_table['quaternion_xyzw_worldframe']  
 
                 if frame == 'fat_world':
@@ -1106,7 +1108,133 @@ def run_multiple():
 
     f.close()
 
-   
+
+def run_roman_crate():
+    image_directory = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
+    annotation_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed/instances_newmap1_roman_2018.json'
+    fat_image = FATImage(
+        coco_annotation_file=annotation_file, 
+        coco_image_directory=image_directory, 
+        depth_factor=100, 
+        model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/roman',
+        model_mesh_in_mm=True,
+        # model_mesh_scaling_factor=0.005,
+        model_mesh_scaling_factor=1,
+        models_flipped=False
+    )
+
+    f_runtime = open('runtime.txt', "w")
+    # f_accuracy = open('accuracy.txt', "w")
+    f_runtime.write("{} {} {}\n".format('name', 'expands', 'runtime'))
+
+    required_objects = ['crate_test']
+    # f_accuracy.write("name ")
+    # for object_name in required_objects:
+    #     f_accuracy.write("{} ".format(object_name)) 
+    # f_accuracy.write("\n")
+
+
+    for img_i in ['00']:
+        
+        # required_objects = ['coke']
+        image_name = 'NewMap1_roman/0000{}.left.png'.format(img_i)
+        image_data, annotations = fat_image.get_random_image(name=image_name, required_objects=required_objects)
+        
+        yaw_only_objects, max_min_dict, transformed_annotations = \
+            fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
+
+        max_min_dict['ymax'] = 0.75
+        max_min_dict['ymin'] = -0.75
+        max_min_dict['xmax'] = 0.5
+        max_min_dict['xmin'] = -0.1
+        fat_image.search_resolution_translation = 0.08
+
+        perch_annotations, stats = fat_image.visualize_perch_output(
+            image_data, annotations, max_min_dict, frame='table', 
+            use_external_render=0, required_object=required_objects,
+            # use_external_render=0, required_object=['coke', 'sprite', 'pepsi'],
+            # use_external_render=0, required_object=['sprite', 'coke', 'pepsi'],
+            camera_optical_frame=False, use_external_pose_list=0, gt_annotations=transformed_annotations
+        )
+        # print(perch_annotations)
+        # print(transformed_annotations)
+
+        # f_accuracy.write("{} ".format(image_data['file_name']))
+        # accuracy_dict = fat_image.compare_clouds(transformed_annotations, perch_annotations)
+        # for object_name in required_objects:
+        #     f_accuracy.write("{} ".format(accuracy_dict[object_name])) 
+        # f_accuracy.write("\n")
+
+        f_runtime.write("{} {} {}\n".format(image_name, stats['expands'], stats['runtime']))
+
+    f_runtime.close()
+
+def run_sameshape():
+    ## Running on PERCH only with synthetic color dataset - shape
+    # Use normalize cost to get best results
+    image_directory = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
+    annotation_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed/instances_newmap1_turbosquid_2018.json'
+    fat_image = FATImage(
+        coco_annotation_file=annotation_file, 
+        coco_image_directory=image_directory, 
+        depth_factor=100, 
+        model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/SameShape/turbosquid',
+        model_mesh_in_mm=True,
+        # model_mesh_scaling_factor=0.005,
+        model_mesh_scaling_factor=1,
+        models_flipped=False
+    )
+
+    f_runtime = open('runtime.txt', "w")
+    f_accuracy = open('accuracy.txt', "w")
+    f_runtime.write("{} {} {}\n".format('name', 'expands', 'runtime'))
+    
+    # required_objects = ['sprite', 'coke', 'pepsi']
+    # required_objects = ['fanta_bottle', 'coke_bottle']
+    # required_objects = ['coke_can', 'coke_bottle']
+    required_objects = ['coke_can', 'coke_bottle', 'sprite_bottle', 'pepsi_can']
+    f_accuracy.write("name ")
+    for object_name in required_objects:
+        f_accuracy.write("{} ".format(object_name)) 
+    f_accuracy.write("\n")
+
+    # for img_i in ['00', '01', '10']:
+    # for img_i in ['14', '20', '25', '33', '38', '48']:
+    for img_i in ['32']:
+        
+        # required_objects = ['coke']
+        image_name = 'NewMap1_turbosquid/0000{}.left.png'.format(img_i)
+        image_data, annotations = fat_image.get_random_image(name=image_name, required_objects=required_objects)
+        
+        yaw_only_objects, max_min_dict, transformed_annotations = \
+            fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
+
+        max_min_dict['ymax'] = 1.5
+        max_min_dict['ymin'] = -1.5
+        max_min_dict['xmax'] = 0.5
+        max_min_dict['xmin'] = -0.5
+        fat_image.search_resolution_translation = 0.08
+
+        perch_annotations, stats = fat_image.visualize_perch_output(
+            image_data, annotations, max_min_dict, frame='table', 
+            use_external_render=0, required_object=required_objects,
+            # use_external_render=0, required_object=['coke', 'sprite', 'pepsi'],
+            # use_external_render=0, required_object=['sprite', 'coke', 'pepsi'],
+            camera_optical_frame=False, use_external_pose_list=0, gt_annotations=transformed_annotations
+        )
+        # print(perch_annotations)
+        # print(transformed_annotations)
+
+        f_accuracy.write("{} ".format(image_data['file_name']))
+        accuracy_dict = fat_image.compare_clouds(transformed_annotations, perch_annotations)
+        for object_name in required_objects:
+            f_accuracy.write("{} ".format(accuracy_dict[object_name])) 
+        f_accuracy.write("\n")
+
+        f_runtime.write("{} {} {}\n".format(image_name, stats['expands'], stats['runtime']))
+
+    f_runtime.close()
+    f_accuracy.close()
 
 if __name__ == '__main__':
     
@@ -1163,68 +1291,13 @@ if __name__ == '__main__':
     #     camera_optical_frame=False, use_external_pose_list=0
     # )
 
-    ## Running on PERCH only with synthetic color dataset - shape
-    # Use normalize cost to get best results
-    image_directory = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
-    annotation_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed/instances_soda_val_pose_2018.json'
-    fat_image = FATImage(
-        coco_annotation_file=annotation_file, 
-        coco_image_directory=image_directory, 
-        depth_factor=100, 
-        model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/SameShape/',
-        model_mesh_in_mm=True,
-        model_mesh_scaling_factor=0.0275,
-        models_flipped=True
-    )
-
-    f_runtime = open('runtime.txt', "w")
-    f_accuracy = open('accuracy.txt', "w")
-    f_runtime.write("{} {} {}\n".format('name', 'expands', 'runtime'))
     
-    required_objects = ['sprite', 'coke', 'pepsi']
-    f_accuracy.write("name ")
-    for object_name in required_objects:
-        f_accuracy.write("{} ".format(object_name)) 
-    f_accuracy.write("\n")
-
-    for img_i in ['00', '01', '10']:
-    # for img_i in ['14', '20', '25', '33', '38', '48']:
-    # for img_i in ['25']:
-        
-        # required_objects = ['coke']
-        image_name = 'NewMap1_soda_cans/0000{}.left.png'.format(img_i)
-        image_data, annotations = fat_image.get_random_image(name=image_name, required_objects=required_objects)
-        
-        yaw_only_objects, max_min_dict, transformed_annotations = \
-            fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
-
-        max_min_dict['ymax'] = 1.5
-        max_min_dict['ymin'] = -1.5
-        max_min_dict['xmax'] = 0.5
-        max_min_dict['xmin'] = -0.5
-        fat_image.search_resolution_translation = 0.05
-
-        perch_annotations, stats = fat_image.visualize_perch_output(
-            image_data, annotations, max_min_dict, frame='table', 
-            use_external_render=0, required_object=required_objects,
-            # use_external_render=0, required_object=['coke', 'sprite', 'pepsi'],
-            # use_external_render=0, required_object=['sprite', 'coke', 'pepsi'],
-            camera_optical_frame=False, use_external_pose_list=0, gt_annotations=transformed_annotations
-        )
-        # print(perch_annotations)
-        # print(transformed_annotations)
-
-        f_accuracy.write("{} ".format(image_data['file_name']))
-        accuracy_dict = fat_image.compare_clouds(transformed_annotations, perch_annotations)
-        for object_name in required_objects:
-            f_accuracy.write("{} ".format(accuracy_dict[object_name])) 
-        f_accuracy.write("\n")
-
-        f_runtime.write("{} {} {}\n".format(image_name, stats['expands'], stats['runtime']))
-
-    f_runtime.close()
-    f_accuracy.close()
-
-    ## Run Perch with Model
+    ## Run Perch with Network Model
     # Dont use normalize cost and run with shifting centroid
     # run_multiple()
+
+    ## Run Perch with SameShape
+    # run_sameshape()
+
+    ## Run Perch with crate
+    run_roman_crate()

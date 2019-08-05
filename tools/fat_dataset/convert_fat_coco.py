@@ -94,14 +94,14 @@ if False:
 
 if True:
     ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
-    SCENES = [ "NewMap1_soda_cans" ]
+    SCENES = [ "NewMap1_turbosquid" ]
 
     object_settings_file = Path(os.path.join(ROOT_DIR, SCENES[0], "_object_settings.json"))
     camera_settings_file = Path(os.path.join(ROOT_DIR, SCENES[0], "_camera_settings.json"))
     IMAGE_DIR_LIST = [
             "",
     ]
-    OUTFILE_NAME = 'instances_fat_val_pose_2018'
+    OUTFILE_NAME = 'instances_newmap1_turbosquid_2018'
 
 
 
@@ -302,11 +302,11 @@ def get_object_pose_in_world(object_pose, camera_pose, fat_world_pose=None, type
     # object_pose_world = np.matmul(np.linalg.inv(camera_pose_matrix), object_pose_matrix)
     # scale = np.array([[0.01,0,0,0],[0,0.01,0,0],[0,0,0.01,0],[0,0,0,1]])
     # object_pose_world = np.matmul(scale, object_pose_world)
-    # if fat_world_pose is not None:
-    #     fat_world_matrix = np.zeros((4,4))
-    #     fat_world_matrix[:3,:3] = RT_transform.quat2mat(get_wxyz_quaternion(fat_world_pose['quaternion_xyzw']))
-    #     fat_world_matrix[:,3] = fat_world_pose['location'] + [1]
-    #     object_pose_world = np.matmul(fat_world_matrix, object_pose_world)
+    if fat_world_pose is not None:
+        fat_world_matrix = np.zeros((4,4))
+        fat_world_matrix[:3,:3] = RT_transform.quat2mat(get_wxyz_quaternion(fat_world_pose['quaternion_xyzw']))
+        fat_world_matrix[:,3] = fat_world_pose['location'] + [1]
+        object_pose_world = np.matmul(fat_world_matrix, object_pose_world)
 
     # print(object_pose_world)
     if type == 'quat':
