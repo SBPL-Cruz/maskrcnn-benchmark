@@ -19,8 +19,12 @@ from lib.render_glumpy.render_py import Render_Py
 from lib.pair_matching import RT_transform
 import pcl
 from pprint import pprint
+import calendar
+import time
 
-ROS_PYTHON2_PKG_PATH = ['/opt/ros/kinetic/lib/python2.7/dist-packages', '/usr/local/lib/python2.7/dist-packages/']
+ROS_PYTHON2_PKG_PATH = ['/opt/ros/kinetic/lib/python2.7/dist-packages', 
+                            '/usr/local/lib/python2.7/dist-packages/', 
+                            '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/DOPE/catkin_ws/devel/lib/python2.7/dist-packages']
 ROS_PYTHON3_PKG_PATH = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/ros_python3_ws/install/lib/python3/dist-packages'
 # ROS_PYTHON3_PKG_PATH = '/home/jessy/projects/ros_python3_ws/install/lib/python3/dist-packages'
 
@@ -28,7 +32,7 @@ class FATImage:
     def __init__(self, 
             coco_annotation_file=None, coco_image_directory=None, 
             depth_factor=1000, 
-            model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/',
+            model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/models/',
             model_mesh_in_mm=False,
             model_mesh_scaling_factor=1,
             models_flipped=False
@@ -37,8 +41,13 @@ class FATImage:
         self.coco_image_directory = coco_image_directory
         self.example_coco = COCO(coco_annotation_file)
         example_coco = self.example_coco
-        self.categories = example_coco.loadCats(example_coco.getCatIds())
-        self.category_names = [category['name'] for category in self.categories]
+        self.category_id_to_names = example_coco.loadCats(example_coco.getCatIds())
+        self.category_names_to_id = {}
+        self.category_ids = example_coco.getCatIds(catNms=['square', 'shape'])
+        for category in self.category_id_to_names:
+            self.category_names_to_id[category['name']] = category['id']
+
+        self.category_names = list(self.category_names_to_id.keys())
         print('Custom COCO categories: \n{}\n'.format(' '.join(self.category_names)))
         # print(coco_predictions)
         # print(all_predictions[:5])
@@ -46,7 +55,6 @@ class FATImage:
         # ## Load Image from COCO Dataset
 
 
-        self.category_ids = example_coco.getCatIds(catNms=['square'])
         self.image_ids = example_coco.getImgIds(catIds=self.category_ids)
         
         self.viewpoints_xyz = np.array(example_coco.dataset['viewpoints'])
@@ -60,16 +68,18 @@ class FATImage:
         self.depth_factor = depth_factor
 
         self.world_to_fat_world = {}
-        self.world_to_fat_world['location'] = [0,0,0.010]
+        self.world_to_fat_world['location'] = [0,0,0]
         # self.world_to_fat_world['quaternion_xyzw'] = [0.853, -0.147, -0.351, -0.357]
-        self.world_to_fat_world['quaternion_xyzw'] = [0,0,0,1]
+        self.world_to_fat_world['quaternion_xyzw'] = [0,-math.sqrt(5),0,math.sqrt(5)]
         self.model_dir = model_dir
         self.model_params = {
             'mesh_in_mm' : model_mesh_in_mm,
             'mesh_scaling_factor' : model_mesh_scaling_factor,
             'flipped' : models_flipped
         }
-        self.rendered_root_dir = os.path.join(self.model_dir, "rendered")
+        # self.rendered_root_dir = os.path.join(self.model_dir, "rendered")
+        self.rendered_root_dir = os.path.join(os.path.abspath(os.path.join(self.model_dir, os.pardir)), "rendered")
+        print("Rendering or Poses output dir : {}".format(self.rendered_root_dir))
         mkdir_if_missing(self.rendered_root_dir)
 
         self.search_resolution_translation = 0.08
@@ -83,6 +93,27 @@ class FATImage:
                                      [0, -1, 0, 0],
                                      [0, 0, 0, 1]])
         # self.world_to_fat_world['quaternion_xyzw'] = [0.7071, 0, 0, -0.7071]
+        self.symmetry_info = {
+            "025_mug" : 0,
+            "004_sugar_box" : 1,
+            "008_pudding_box" : 1,
+            "009_gelatin_box" : 1,
+            "010_potted_meat_can" : 1,
+            "024_bowl" : 2,
+            "003_cracker_box" : 1,
+            "002_master_chef_can" : 2,
+            "006_mustard_bottle" : 1,
+            "pepsi" : 2,
+            "coke" : 2,
+            "sprite" : 2,
+            "pepsi_can" : 2,
+            "coke_can" : 2,
+            "sprite_can" : 2,
+            "coke_bottle" : 2,
+            "sprite_bottle" : 2,
+            "fanta_bottle" : 2,
+            "crate_test" : 1
+        }
 
     def get_random_image(self, name=None, required_objects=None):
         # image_data = self.example_coco.loadImgs(self.image_ids[np.random.randint(0, len(self.image_ids))])[0]
@@ -95,7 +126,7 @@ class FATImage:
                     found = True
                     break
             if found == False:
-                raise Exception("File not found")
+                return None, None
         else:
             image_data = self.example_coco.loadImgs(self.image_ids[7000])[0]
         # image_data = self.example_coco.loadImgs(self.image_ids[0])[0]
@@ -107,7 +138,7 @@ class FATImage:
         if required_objects is not None:
             filtered_annotations = []
             for annotation in annotations:
-                class_name = self.categories[annotation['category_id']]['name']
+                class_name = self.category_id_to_names[annotation['category_id']]['name']
                 if class_name in required_objects:
                     filtered_annotations.append(annotation)
             return image_data, filtered_annotations
@@ -152,7 +183,7 @@ class FATImage:
                 self.inplane_rotations, annotation['inplane_rotation_id']
             )
             xyz_rotation_angles = [phi, theta, inplane_rotation_angle]
-            class_name = self.categories[annotation['category_id']]['name']
+            class_name = self.category_id_to_names[annotation['category_id']]['name']
             print("*****{}*****".format(class_name))
             print("Recovered rotation : {}".format(xyz_rotation_angles))
             quat = annotation['quaternion_xyzw']
@@ -390,7 +421,8 @@ class FATImage:
 
 
     def visualize_pose_ros(
-            self, image_data, annotations, frame='camera', camera_optical_frame=True, num_publish=10, write_poses=False, ros_publish=True
+            self, image_data, annotations, frame='camera', camera_optical_frame=True, num_publish=10, write_poses=False, ros_publish=True,
+            get_table_pose=False
         ):
         print("ROS visualizing")
         if '/opt/ros/kinetic/lib/python2.7/dist-packages' not in sys.path:
@@ -444,7 +476,7 @@ class FATImage:
 
         cam_to_body = self.cam_to_body if camera_optical_frame == False else None
 
-        if frame == 'camera' or frame =='table':
+        if (frame == 'camera' and get_table_pose) or frame =='table':
             depth_img_path = self.get_depth_img_path(color_img_path)
             print("depth_img_path : {}".format(depth_img_path))
             table_pose_msg, scene_cloud, camera_pose_table = self.get_camera_pose_relative_table(depth_img_path)
@@ -455,8 +487,9 @@ class FATImage:
         for i in range(num_publish):
             yaw_only_objects = []
             count = 0
+            units = 'cm'
             for annotation in annotations:
-                class_name = self.categories[annotation['category_id']]['name']
+                class_name = self.category_id_to_names[annotation['category_id']]['name']
                 
                 if frame == 'camera':
                     location, quat = annotation['location'], annotation['quaternion_xyzw']
@@ -464,6 +497,18 @@ class FATImage:
                 if frame == 'table':
                     location, quat = get_object_pose_in_world(annotation, camera_pose_table)
                     # location, quat = get_object_pose_in_world(annotation, camera_pose_table, self.world_to_fat_world)
+                    location, quat = self.get_object_pose_with_fixed_transform(
+                        class_name, location, 
+                        RT_transform.quat2euler(get_wxyz_quaternion(quat)), 
+                        'quat',
+                        use_fixed_transform=True,
+                        invert_fixed_transform=False
+                    )
+                    # units = 'm'
+                    location = (np.array(location)*100).tolist()
+                    if class_name == 'sprite_bottle' or class_name == 'coke_bottle':
+                        location[2] = 0   
+
                     camera_location, camera_quat = camera_pose_table['location_worldframe'], camera_pose_table['quaternion_xyzw_worldframe']  
 
                 if frame == 'fat_world':
@@ -475,10 +520,10 @@ class FATImage:
                     camera_location, camera_quat = get_camera_pose_in_world(
                                                         annotation['camera_pose'], self.world_to_fat_world, type='quat', cam_to_body=cam_to_body
                                                     )      
-                object_pose_ros = self.get_ros_pose(location, quat)
+                object_pose_ros = self.get_ros_pose(location, quat, units)
                 object_pose_msg.poses.append(object_pose_ros)
                 max_min_dict = self.update_coordinate_max_min(max_min_dict, location)
-                if (frame == 'camera' or frame == 'table') and ros_publish:
+                if ((frame == 'camera' and get_table_pose) or frame == 'table') and ros_publish:
                     self.table_pose_pub.publish(table_pose_msg)
                     self.scene_cloud_pub.publish(scene_cloud)
 
@@ -498,7 +543,7 @@ class FATImage:
                     transformed_annotations.append({
                         'location' : location,
                         'quaternion_xyzw' : quat,
-                        'category_id' : self.category_names.index(class_name),
+                        'category_id' : self.category_names_to_id[class_name],
                         'id' : count
                     })
                     count += 1
@@ -557,11 +602,17 @@ class FATImage:
         # K = self.camera_intrinsic_matrix
         ZNEAR = 0.1
         ZFAR = 20
-        model_dir = os.path.join(self.model_dir, "models", class_name)
+        # model_dir = os.path.join(self.model_dir, "models", class_name)
+
+        # Get Path to original YCB models for obj files for rendering
+        model_dir = os.path.join(os.path.abspath(os.path.join(self.model_dir, os.pardir)), "models")
+        model_dir = os.path.join(model_dir, class_name)
         render_machine = Render_Py(model_dir, self.camera_intrinsic_matrix, width, height, ZNEAR, ZFAR)
         return render_machine
 
-    def get_object_pose_with_fixed_transform(self, class_name, location, rotation_angles, type, use_fixed_transform=True):
+    def get_object_pose_with_fixed_transform(
+            self, class_name, location, rotation_angles, type, use_fixed_transform=True, invert_fixed_transform=False
+        ):
         # Location in cm
         # Add fixed transform to given object transform so that it can be applied to a model
         object_world_transform = np.zeros((4,4))
@@ -571,13 +622,16 @@ class FATImage:
         if use_fixed_transform:
             fixed_transform = np.transpose(np.array(self.fixed_transforms_dict[class_name]))
             fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
-            total_transform = np.matmul(object_world_transform, fixed_transform)
+            if invert_fixed_transform:
+                total_transform = np.matmul(object_world_transform, np.linalg.inv(fixed_transform))
+            else:
+                total_transform = np.matmul(object_world_transform, fixed_transform)
         else:
             total_transform = object_world_transform
 
         if type == 'quat':
             quat = RT_transform.mat2quat(total_transform[:3, :3]).tolist()
-            return total_transform[:3,3], get_xyzw_quaternion(quat)
+            return total_transform[:3,3].tolist(), get_xyzw_quaternion(quat)
         elif type == 'rot':
             return total_transform
         elif type == 'euler':
@@ -674,7 +728,7 @@ class FATImage:
     def visualize_perch_output(self, image_data, annotations, max_min_dict, frame='fat_world', 
             use_external_render=0, required_object='004_sugar_box', camera_optical_frame=True,
             use_external_pose_list=0, model_poses_file=None, use_centroid_shifting=0, predicted_mask_path=None,
-            gt_annotations=None
+            gt_annotations=None, input_camera_pose=None
         ):
         from perch import FATPerch
         print("camera instrinsics : {}".format(self.camera_intrinsics))
@@ -682,26 +736,28 @@ class FATImage:
         
         cam_to_body = self.cam_to_body if camera_optical_frame == False else None
         color_img_path = os.path.join(self.coco_image_directory, image_data['file_name'])
-        # depth_img_path = color_img_path.replace(os.path.splitext(color_img_path)[1], '.depth.png')
         depth_img_path = self.get_depth_img_path(color_img_path)
         print("depth_img_path : {}".format(depth_img_path))
-        # Get camera pose for PERCH and rendering objects if needed
-        if frame == 'fat_world':
-            camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], None, 'rot', cam_to_body=cam_to_body)
-            camera_pose[:3, 3] /= 100 
-        if frame == 'world':
-            camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], self.world_to_fat_world, 'rot', cam_to_body=cam_to_body)
-            camera_pose[:3, 3] /= 100 
-        if frame == 'table':
-            _, _, camera_pose = self.get_camera_pose_relative_table(depth_img_path, type='rot', cam_to_body=cam_to_body)
-            camera_pose[:3, 3] /= 100 
-            
-        if frame == 'camera':
-            camera_pose = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
-            if cam_to_body is not None:
-                camera_pose = np.matmul(camera_pose, np.linalg.inv(cam_to_body))
 
-        # camera_pose[:3, 3] /= 100 
+        # Get camera pose for PERCH and rendering objects if needed
+        if input_camera_pose is None:
+            if frame == 'fat_world':
+                camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], None, 'rot', cam_to_body=cam_to_body)
+                camera_pose[:3, 3] /= 100 
+            if frame == 'world':
+                camera_pose = get_camera_pose_in_world(annotations[0]['camera_pose'], self.world_to_fat_world, 'rot', cam_to_body=cam_to_body)
+                camera_pose[:3, 3] /= 100 
+            if frame == 'table':
+                _, _, camera_pose = self.get_camera_pose_relative_table(depth_img_path, type='rot', cam_to_body=cam_to_body)
+                camera_pose[:3, 3] /= 100 
+            if frame == 'camera':
+                # For 6D version we run in camera frame
+                camera_pose = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
+                if cam_to_body is not None:
+                    camera_pose = np.matmul(camera_pose, np.linalg.inv(cam_to_body))
+        else:
+            # Using hardcoded input camera pose from somewhere
+            camera_pose = input_camera_pose
 
         print("camera_pose : {}".format(camera_pose))
 
@@ -717,10 +773,10 @@ class FATImage:
         if use_external_render == 1:
             self.render_perch_poses(max_min_dict, required_object, camera_pose)
 
-        if use_external_pose_list == 1:
-            models_root = os.path.join(self.model_dir, 'aligned_cm')
-        else:
-            models_root = os.path.join(self.model_dir, 'models')
+        # if use_external_pose_list == 1:
+        #     models_root = os.path.join(self.model_dir, 'aligned_cm')
+        # else:
+        #     models_root = os.path.join(self.model_dir, 'models')
 
         camera_pose = camera_pose.flatten().tolist()
         params = {
@@ -760,10 +816,11 @@ class FATImage:
             params=params, 
             input_image_files=input_image_files, 
             camera_params=camera_params,
-            object_names=self.category_names,
+            object_names_to_id=self.category_names_to_id,
             output_dir_name=self.get_clean_name(image_data['file_name']),
-            models_root=models_root,
-            model_params=self.model_params
+            models_root=self.model_dir,
+            model_params=self.model_params,
+            symmetry_info=self.symmetry_info
         )
         perch_annotations = fat_perch.run_perch_node(model_poses_file)
         return perch_annotations
@@ -796,7 +853,7 @@ class FATImage:
         cfg_file = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/configs/fat_pose/e2e_mask_rcnn_R_50_FPN_1x_test_cocostyle.yaml'
         args = {
             'config_file' : cfg_file,
-            'confidence_threshold' : 0.7,
+            'confidence_threshold' : 0.85,
             'min_image_size' : 750,
             'masks_per_dim' : 10,
             'show_mask_heatmaps' : False
@@ -811,7 +868,8 @@ class FATImage:
             masks_per_dim=args['masks_per_dim'],
             min_image_size=args['min_image_size'],
             categories = self.category_names,
-            topk_rotations=9
+            # topk_rotations=9
+            topk_rotations=3
         )
         color_img_path = os.path.join(self.coco_image_directory, image_data['file_name'])
         color_img = cv2.imread(color_img_path)
@@ -828,7 +886,7 @@ class FATImage:
         top_inplane_rotation_ids = rotation_list['top_inplane_rotation_ids']
         labels = rotation_list['labels']
 
-        fig = plt.figure(1, (8., 8.), dpi=6000)
+        fig = plt.figure(None, (5., 5.), dpi=3000)
         plt.axis("off")
         plt.tight_layout()
         if use_thresh == False:
@@ -840,8 +898,8 @@ class FATImage:
             grid[0].imshow(cv2.cvtColor(composite, cv2.COLOR_BGR2RGB))
             grid[0].axis("off")
         else:
-            # grid_size = top_viewpoint_ids[0,:].shape[0]*top_inplane_rotation_ids[0,:].shape[0]+1
-            grid_size = top_inplane_rotation_ids[0,:].shape[0]+1
+            grid_size = top_viewpoint_ids[0,:].shape[0]*top_inplane_rotation_ids[0,:].shape[0]+1
+            # grid_size = top_inplane_rotation_ids[0,:].shape[0]+1
             grid = ImageGrid(fig, 111,  
                         nrows_ncols=(top_viewpoint_ids.shape[0], grid_size),
                         axes_pad=0.1, 
@@ -880,14 +938,14 @@ class FATImage:
                 # plt.imshow(mask_list[box_id])
                 object_depth_mask = depth_image[mask_list[box_id] > 0]/self.depth_factor
                 object_depth_mask = object_depth_mask.flatten()
-                object_depth_mask = self.reject_outliers(object_depth_mask)
+                # object_depth_mask = self.reject_outliers(object_depth_mask)
                 object_depth = np.mean(object_depth_mask)
                 min_depth = np.min(object_depth_mask)
                 max_depth = np.max(object_depth_mask)
                 object_rotation_list = []
                 # plt.show()
                 grid[grid_i].imshow(cv2.cvtColor(composite, cv2.COLOR_BGR2RGB))
-                grid[grid_i].scatter(centroids_2d[box_id][0], centroids_2d[box_id][1], s=1)
+                # grid[grid_i].scatter(centroids_2d[box_id][0], centroids_2d[box_id][1], s=1)
                 grid[grid_i].axis("off")
                 grid_i += 1
                 label = labels[box_id]
@@ -895,9 +953,9 @@ class FATImage:
                 # rendered_dir = os.path.join(self.rendered_root_dir, label)
                 # mkdir_if_missing(rendered_dir)
                 # rendered_pose_list_out = []
-                # for viewpoint_id in top_viewpoint_ids[box_id, :]:
-                #     for inplane_rotation_id in top_inplane_rotation_ids[box_id, :]:
-                for viewpoint_id, inplane_rotation_id in zip(top_viewpoint_ids[box_id, :],top_inplane_rotation_ids[box_id, :]):
+                for viewpoint_id in top_viewpoint_ids[box_id, :]:
+                    for inplane_rotation_id in top_inplane_rotation_ids[box_id, :]:
+                # for viewpoint_id, inplane_rotation_id in zip(top_viewpoint_ids[box_id, :],top_inplane_rotation_ids[box_id, :]):
                         fixed_transform = self.fixed_transforms_dict[label]
                         theta, phi = get_viewpoint_rotations_from_id(self.viewpoints_xyz, viewpoint_id)
                         inplane_rotation_angle = get_inplane_rotation_from_id(self.inplane_rotations, inplane_rotation_id)
@@ -918,7 +976,7 @@ class FATImage:
                         # centroid = shifted_centroid
                         # print("Center after rotation : {}".format())
                         grid[grid_i].imshow(cv2.cvtColor(rgb_gl, cv2.COLOR_BGR2RGB))
-                        grid[grid_i].scatter(centroids_2d[box_id][0], centroids_2d[box_id][1], s=1)
+                        # grid[grid_i].scatter(centroids_2d[box_id][0], centroids_2d[box_id][1], s=1)
                         # grid[grid_i].scatter(shifted_centeroid_2d[0], shifted_centeroid_2d[1], s=1)
                         grid[grid_i].axis("off")
                         grid_i += 1
@@ -929,45 +987,68 @@ class FATImage:
                             annotations.append({
                                 'location' : (centroid_world_point*100).tolist(),
                                 'quaternion_xyzw' : quaternion,
-                                'category_id' : self.category_names.index(label),
+                                'category_id' : self.category_names_to_id[label],
                                 'id' : grid_i
                             })
                         else :
                             # Collect rotations only for this object
                             object_rotation_list.append(quaternion)
 
+                use_xy = False
+                resolution = 0.02
+                # resolution = 0.05
                 if use_centroid == False:
                     # Add predicted rotations in depth range
-                    for _, depth in enumerate(np.arange(min_depth, max_depth, 0.02)):
-                        centre_world_point = self.get_world_point(np.array(centroids_2d[box_id].tolist() + [depth]))
-                        for quaternion in object_rotation_list:
-                            annotations.append({
-                                'location' : (centre_world_point*100).tolist(),
-                                'quaternion_xyzw' : quaternion,
-                                'category_id' : self.category_names.index(label),
-                                'id' : grid_i
-                            })
-                            
-        model_poses_file = 'model_output_{}.png'.format(self.get_clean_name(image_data['file_name']))
+                    for _, depth in enumerate(np.arange(min_depth, max_depth, resolution)):
+                        if use_xy:
+                            x_y_min_point = self.get_world_point(np.array(boxes[box_id][0] + [depth]))
+                            x_y_max_point = self.get_world_point(np.array(boxes[box_id][1] + [depth]))
+                            # print(x_y_min_point)
+                            # print(x_y_max_point)
+                            for x in np.arange(x_y_min_point[0], x_y_max_point[0], resolution):
+                                for y in np.arange(x_y_min_point[1], x_y_max_point[1], resolution):
+                                    for quaternion in object_rotation_list:
+                                        annotations.append({
+                                            'location' : [x*100, y*100, depth*100],
+                                            'quaternion_xyzw' : quaternion,
+                                            'category_id' : self.category_names_to_id[label],
+                                            'id' : grid_i
+                                        })
+                        else:
+                            centre_world_point = self.get_world_point(np.array(centroids_2d[box_id].tolist() + [depth]))
+                            for quaternion in object_rotation_list:
+                                annotations.append({
+                                    'location' : (centre_world_point*100).tolist(),
+                                    'quaternion_xyzw' : quaternion,
+                                    'category_id' : self.category_names_to_id[label],
+                                    'id' : grid_i
+                                })
+
+        mkdir_if_missing('model_outputs')                            
+        model_poses_file = 'model_outputs/model_output_{}.png'.format(self.get_clean_name(image_data['file_name']))
         plt.savefig(
             model_poses_file, 
             dpi=1000, bbox_inches = 'tight', pad_inches = 0
         )
+        plt.close(fig)
 
 
         # plt.show()
         return labels, annotations, model_poses_file, predicted_mask_path
 
-    def compare_clouds(self, annotations_1, annotations_2):
+    def compare_clouds(self, annotations_1, annotations_2, downsample=False, use_add_s=True):
         from plyfile import PlyData, PlyElement
+        import scipy
+        from sklearn.metrics import pairwise_distances_chunked, pairwise_distances_argmin_min
         result_dict = {}
-        for i in range(len(annotations_1)):
-            annotation_1 = annotations_1[i]
-            annotation_2 = [annotations_2[j] for j in range(len(annotations_2)) if annotation_1['category_id'] == annotations_2[j]['category_id']][0]
+        for i in range(len(annotations_2)):
+            annotation_2 = annotations_2[i]
+            annotation_1 = [annotations_1[j] for j in range(len(annotations_1)) if annotation_2['category_id'] == annotations_1[j]['category_id']]
+            annotation_1 = annotation_1[0]
 
-            object_name = self.category_names[annotation_1['category_id']]
+            object_name = self.category_id_to_names[annotation_1['category_id']]['name']
 
-            file_path = os.path.join(self.model_dir, "models", object_name, "textured.ply")
+            file_path = os.path.join(self.model_dir, object_name, "textured.ply")
             # cloud = pywavefront.Wavefront(file_path)
             cloud = PlyData.read(file_path).elements[0].data
             cloud = np.transpose(np.vstack((cloud['x'], cloud['y'], cloud['z'])))
@@ -975,11 +1056,20 @@ class FATImage:
             # cloud = pcl.load_XYZI(file_path)
             # cloud = np.asarray(cloud)
             cloud = np.hstack((cloud, np.ones((cloud.shape[0], 1))))
-            # print(cloud)
 
-            annotation_1_cat = self.categories[annotation_1['category_id']]['name']
-            annotation_2_cat = self.categories[annotation_2['category_id']]['name']
+            if downsample:
+                print("Before downsammpling : {}".format(cloud.shape))
+                cloud = cloud.astype('float32')
+                pcl_cloud = pcl.PointCloud_PointXYZRGB()
+                pcl_cloud.from_array(cloud)
+                sor = pcl_cloud.make_voxel_grid_filter()
+                sor.set_leaf_size(0.01, 0.01, 0.01)
+                cloud_filtered = sor.filter()
+                cloud = cloud_filtered.to_array()
+                print("After downsampling: {}".format(cloud.shape))
 
+            annotation_1_cat = self.category_id_to_names[annotation_1['category_id']]['name']
+            annotation_2_cat = self.category_id_to_names[annotation_2['category_id']]['name']
 
             print("Locations {} {}: {}, {}".format(
                 annotation_1_cat, annotation_2_cat, annotation_1['location'], annotation_2['location'])
@@ -987,11 +1077,39 @@ class FATImage:
             print("Quaternions {} {}: {}, {}".format(
                 annotation_1_cat, annotation_2_cat, annotation_1['quaternion_xyzw'], annotation_2['quaternion_xyzw'])
             )
-
+            # Get GT transform matrix
             total_transform_1 = self.get_object_pose_with_fixed_transform(
                 object_name, annotation_1['location'], RT_transform.quat2euler(get_wxyz_quaternion(annotation_1['quaternion_xyzw'])), 'rot',
                 use_fixed_transform=False
             )
+            transformed_cloud_1 = np.matmul(total_transform_1, np.transpose(cloud))
+            # l = transformed_cloud_1[:,3]
+
+            # Get predicted transform matrix
+            total_transform_2 = annotation_2['transform_matrix']
+            transformed_cloud_2 = np.matmul(total_transform_2, np.transpose(cloud))
+            # l = transformed_cloud_2[:,3]
+
+            if self.symmetry_info[annotation_1_cat] == 2 and use_add_s:
+                # Do ADD-S for symmetric objects
+                transformed_cloud_1 = np.transpose(transformed_cloud_1)[:,:3]
+                transformed_cloud_2 = np.transpose(transformed_cloud_2)[:,:3]
+                # For below func matrix should be samples x features
+                pairwise_distances = pairwise_distances_argmin_min(
+                    transformed_cloud_1, transformed_cloud_2, metric='euclidean', metric_kwargs={'n_jobs':6}
+                )
+                # Mean of nearest points
+                mean_dist = np.mean(pairwise_distances[1])
+            else:
+                # Mean of corresponding points
+                mean_dist = np.linalg.norm(transformed_cloud_1-transformed_cloud_2, axis=0)
+                mean_dist = np.sum(mean_dist)/cloud.shape[0]
+
+            print("Average pose distance (in m) : {}".format(mean_dist))
+            result_dict[object_name] = mean_dist
+
+        return result_dict
+
             # scaling_transform = np.zeros((4,4))
             # scaling_transform[3,3] = 1
             # scaling_transform[0,0] = 0.0275
@@ -1001,112 +1119,196 @@ class FATImage:
             # scaling_transform_flip[2,2] = -0.0275
             # total_transform_1 =  np.matmul(total_transform_1, scaling_transform_flip)
 
-            scaling_transform = annotation_2['preprocessing_transform_matrix']
-            scaling_transform[2,3] = 0
-            total_transform_1 =  np.matmul(total_transform_1, scaling_transform)
+            # scaling_transform = annotation_2['preprocessing_transform_matrix']
+            # scaling_transform[2,3] = 0
+            # total_transform_1 =  np.matmul(total_transform_1, scaling_transform)
             # print(total_transform_1)
-            # transformed_cloud_1 = np.matmul(total_transform_1, np.transpose(cloud))
-            transformed_cloud_1 = np.matmul(cloud, total_transform_1)
+            # transformed_cloud_1 = np.matmul(cloud, total_transform_1)
             # print(transformed_cloud_1)
 
-            l = transformed_cloud_1[:,3]
             # transformed_cloud_1 = np.divide(transformed_cloud_1[:,:3], transformed_cloud_1[:,3])
-            transformed_cloud_1 = transformed_cloud_1[:,:3]/l[:, np.newaxis]
+            # transformed_cloud_1 = transformed_cloud_1[:,:3]/l[:, np.newaxis]
+            # print(cloud)
+
+            # print(transformed_cloud_1)
 
             # total_transform_2 = self.get_object_pose_with_fixed_transform(
             #     object_name, annotation_2['location'], RT_transform.quat2euler(get_wxyz_quaternion(annotation_2['quaternion_xyzw'])), 'rot',
             #     use_fixed_transform=False
             # )
             # total_transform_2 =  np.matmul(total_transform_2, scaling_transform)
-            # # transformed_cloud_2 = np.matmul(total_transform_2, np.transpose(cloud))
-            total_transform_2 = annotation_2['transform_matrix']
 
-            transformed_cloud_2 = np.matmul(cloud, total_transform_2)
-            l = transformed_cloud_2[:,3]
-            transformed_cloud_2 = transformed_cloud_2[:,:3]/l[:, np.newaxis]
-            print(transformed_cloud_2)
+            # transformed_cloud_2 = np.matmul(cloud, total_transform_2)
+            # transformed_cloud_2 = transformed_cloud_2[:,:3]/l[:, np.newaxis]
+            # print(transformed_cloud_2)
 
-            mean_dist = np.linalg.norm(transformed_cloud_1-transformed_cloud_2, axis=1)
-            mean_dist = np.sum(mean_dist)/cloud.shape[0]
+            
+            # import torch
+            # from torch.autograd import Variable
+            # transformed_cloud_1 = torch.tensor(np.transpose(transformed_cloud_1)[:,:3]).cuda()
+            # transformed_cloud_2 = torch.tensor(np.transpose(transformed_cloud_2)[:,:3]).cuda()
+            # print(transformed_cloud_1)
+            # print(transformed_cloud_2)
+            # def similarity_matrix(x, y):
+            #     # get the product x * y
+            #     # here, y = x.t()
+            #     r = torch.mm(x, y.t())
+            #     # get the diagonal elements
+            #     diag = r.diag().unsqueeze(0)
+            #     diag = diag.expand_as(r)
+            #     # compute the distance matrix
+            #     D = diag + diag.t() - 2*r
+            #     return D.sqrt()
+
+            # def row_pairwise_distances(x, y=None, dist_mat=None):
+            #     if y is None:
+            #         y = x
+            #     if dist_mat is None:
+            #         dtype = x.data.type()
+            #         dist_mat = Variable(torch.Tensor(x.size()[0]).type(dtype))
+
+            #     for i, row in enumerate(x.split(1)):
+            #         r_v = row.expand_as(y)
+            #         sq_dist = torch.sum((r_v - y) ** 2, 1)
+            #         dist_mat[i] = torch.min(sq_dist.view(1, -1))
+            #     return dist_mat
+            # print(similarity_matrix(transformed_cloud_1, transformed_cloud_2))
+            # torch.cdist(transformed_cloud_1, transformed_cloud_2)
+            # pdist = torch.nn.PairwiseDistance(p=2)
+            # pair_dist = pdist(transformed_cloud_1, transformed_cloud_2)
+            # print(pair_dist.shape)
+            # set_config(working_memory=4000)
+            
+            # pairwise_distances = scipy.spatial.distance.cdist(transformed_cloud_1, transformed_cloud_2, metric='euclidean')
+
+            # pairwise_distances = pairwise_distances_chunked(transformed_cloud_1, transformed_cloud_2, metric='euclidean')
+            # min_point_indexes = []
+            # temp = [0]
+            # while len(temp) > 0:
+            # min_point_indexes = next(pairwise_distances)
+            # min_point_indexes.append(temp)
+            # print(min_point_indexes)
+            # print(transformed_cloud_2.shape)
+            # print(len(min_point_indexes))
+            # while len(next(pairwise_distances)) > 0:
+            #     continue
             # print(mean_dist)
             #/cloud.shape[0]
-            print("Average pose distance (in m) : {}".format(mean_dist))
-            result_dict[object_name] = mean_dist
-
-        return result_dict
-            # f.write("{} {}\n".format(object_name, mean_dist))
+            
 
 
+def reduce_func(D_chunk, start):
+    neigh = [np.argmin(d).flatten() for i, d in enumerate(D_chunk, start)]
+    return neigh
 
-def run_multiple():
-    
+def run_6d():
     image_directory = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra'
     # annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_2018.json'
-    annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_val_pose_2018.json'
+    # annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_val_pose_2018.json'
+    # annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_6_obj_2018.json'
+    annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_val_pose_6_obj_2018.json'
 
-    fat_image = FATImage(coco_annotation_file=annotation_file, coco_image_directory=image_directory, depth_factor=10000)
+    fat_image = FATImage(
+        coco_annotation_file=annotation_file, 
+        coco_image_directory=image_directory, 
+        depth_factor=10000,
+        model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/YCB_Video_Dataset/aligned_cm',
+        model_mesh_in_mm=False,
+        model_mesh_scaling_factor=1,
+        models_flipped=False
+    )
 
     # Running on model and PERCH
-    # image_data, annotations = fat_image.get_random_image(name='kitchen_0/000002.left.jpg')
-    f = open('accuracy.txt', "w")
+    mkdir_if_missing('model_outputs')
+    ts = calendar.timegm(time.gmtime())
+    f_accuracy = open('model_outputs/accuracy_6d_{}.txt'.format(ts), "w")
+    f_runtime = open('model_outputs/runtime_6d_{}.txt'.format(ts), "w")
+    f_runtime.write("{} {} {}\n".format('name', 'expands', 'runtime'))
 
-    # for category_name in fat_image.category_names:
-    # category_name = "035_power_drill"
-    # category_name = "019_pitcher_base"
-    # category_name = "024_bowl"
-    
-    # Get Image
-    # image_data, annotations = fat_image.get_random_image(name='{}_16k/kitchen_4/000005.left.jpg'.format(category_name))
-    image_data, annotations = fat_image.get_random_image(name='kitchen_4/000015.left.jpg')
+    required_objects = fat_image.category_names
+    f_accuracy.write("name ")
+    for object_name in required_objects:
+        f_accuracy.write("{} ".format(object_name)) 
+    f_accuracy.write("\n")
 
-    # Look at for labels 0 and 1
-    # can be improved by further restricted segmentation mask
-    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000040.left.jpg')
-    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000060.left.jpg')
-    # wrong localization for soup can
-    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000070.left.jpg')
-    # can try with all possible combinations
-    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000100.left.jpg')
-    # Box doesnt look right in this
-    # image_data, annotations = fat_image.get_random_image(name='kitchen_4/000005.left.jpg')
-    # 
+    # couldnt find solution - 14 - occlusion is not possible to solve i think
+    skip_list = ['kitchen_4/000006.left.jpg', 'kitchen_4/000014.left.jpg']
+    # ugly looking - 3,4
+    for img_i in range(0,26):
+    # for img_i in [0]:
+    # for img_i in [11]:
+        
+        # Get Image
+        image_name = 'kitchen_4/0000{}.left.jpg'.format(str(img_i).zfill(2))
+        if image_name in skip_list:
+            continue
+        # image_data, annotations = fat_image.get_random_image(name='{}_16k/kitchen_4/000005.left.jpg'.format(category_name))
+        image_data, annotations = fat_image.get_random_image(
+            name=image_name, required_objects=required_objects
+        )
+        # Skip if required image or image name is not in dataset
+        if image_data is None or annotations is None:
+            continue
 
-    # TODO
-    # restrict segmentation
-    # move in x,y in hypothesis
-    # try all possible combinations of rotation and viewpoint, increase topk number
+        # TODO
+        # restrict segmentation - done
+        # move in x,y in hypothesis - this will help in cases where pose needs to be moved up and down in camera
+        # try all possible combinations of rotation and viewpoint, increase topk number
+        # reduce viewpoint number in training
+        # icp only on pixels of that object
+        # ratios in losses
+        # reduce confidence
+        # try with descretization in ssd paper
+        # in 11,12,21 pose is right but not at right distance from camera - source cost was not getting included
+        # lower epsilon
+        # use in plane from perch
+        # train for more iterations
+        # try without normalize - done - not good
+        # try with lazy
+        # why is centroid in 2d - calculate centroid of mask. check if centroid of generated poses is actually at object center, 11, 12
 
-    # fat_image.compare_clouds(annotations, annotations, f)
+        # after fixing rousre cost : 00 getting messed up, maybe because of getsuccs hack
 
-    # Visualize ground truth in ros
-    # yaw_only_objects, max_min_dict_gt, transformed_annotations = fat_image.visualize_pose_ros(
-    #     image_data, annotations, frame='camera', camera_optical_frame=False, num_publish=1, write_poses=False, ros_publish=False
-    # )
-    
-    # Run model to get multiple poses for each object
-    labels, model_annotations, model_poses_file, predicted_mask_path = fat_image.visualize_model_output(image_data, use_thresh=True, use_centroid=False)
+        # Visualize ground truth in ros
+        # yaw_only_objects, max_min_dict_gt, transformed_annotations = fat_image.visualize_pose_ros(
+        #     image_data, annotations, frame='camera', camera_optical_frame=False, num_publish=1, write_poses=False, ros_publish=True
+        # )
+        
+        # Run model to get multiple poses for each object
+        labels, model_annotations, model_poses_file, predicted_mask_path = \
+            fat_image.visualize_model_output(image_data, use_thresh=True, use_centroid=False)
 
-    # Convert model output poses to table frame and save them to file so that they can be read by perch
-    _, max_min_dict, _ = fat_image.visualize_pose_ros(
-        # image_data, model_annotations, frame='table', camera_optical_frame=False, num_publish=1, write_poses=True, ros_publish=False
-        image_data, model_annotations, frame='camera', camera_optical_frame=False, num_publish=1, write_poses=True, ros_publish=False
-    )
+        if True:
+            # Convert model output poses to table frame and save them to file so that they can be read by perch
+            _, max_min_dict, _ = fat_image.visualize_pose_ros(
+                # image_data, model_annotations, frame='table', camera_optical_frame=False, num_publish=1, write_poses=True, ros_publish=False
+                image_data, model_annotations, frame='camera', camera_optical_frame=False, num_publish=1, write_poses=True, ros_publish=False
+            )
 
-    # Run perch on written poses
-    perch_annotations = fat_image.visualize_perch_output(
-        image_data, model_annotations, max_min_dict, frame='camera', 
-        use_external_render=0, required_object=[labels[0], labels[1]],
-        camera_optical_frame=False, use_external_pose_list=1,
-        model_poses_file=model_poses_file, use_centroid_shifting=1,
-        predicted_mask_path=predicted_mask_path
-    )
+            # Run perch on written poses
+            perch_annotations, stats = fat_image.visualize_perch_output(
+                image_data, model_annotations, max_min_dict, frame='camera', 
+                # use_external_render=0, required_object=[labels[0]],
+                use_external_render=0, required_object=labels,
+                camera_optical_frame=False, use_external_pose_list=1,
+                # model_poses_file=model_poses_file, use_centroid_shifting=0,
+                model_poses_file=model_poses_file, use_centroid_shifting=1,
+                predicted_mask_path=predicted_mask_path
+            )
 
-    # # # Compare Poses by applying to model and computing distance
-    f.write("{}\n".format(image_data['file_name']))
-    fat_image.compare_clouds(transformed_annotations, perch_annotations, f)
+            # # # Compare Poses by applying to model and computing distance
+            f_accuracy.write("{},".format(image_data['file_name']))
+            accuracy_dict = fat_image.compare_clouds(annotations, perch_annotations)
+            for object_name in required_objects:
+                if object_name in accuracy_dict:
+                    f_accuracy.write("{},".format(accuracy_dict[object_name])) 
+                else:
+                    f_accuracy.write(" ,") 
+            f_accuracy.write("\n")
+            f_runtime.write("{} {} {}\n".format(image_data['file_name'], stats['expands'], stats['runtime']))
 
-
-    f.close()
+    f_runtime.close()
+    f_accuracy.close()
 
 
 def run_roman_crate():
@@ -1116,7 +1318,7 @@ def run_roman_crate():
         coco_annotation_file=annotation_file, 
         coco_image_directory=image_directory, 
         depth_factor=100, 
-        model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/roman',
+        model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/roman/model',
         model_mesh_in_mm=True,
         # model_mesh_scaling_factor=0.005,
         model_mesh_scaling_factor=1,
@@ -1134,27 +1336,38 @@ def run_roman_crate():
     # f_accuracy.write("\n")
 
 
-    for img_i in ['00']:
+    for img_i in range(0,25):
+    # for img_i in [16, 17, 19, 22]:
         
         # required_objects = ['coke']
-        image_name = 'NewMap1_roman/0000{}.left.png'.format(img_i)
+        image_name = 'NewMap1_roman/0000{}.left.png'.format(str(img_i).zfill(2))
         image_data, annotations = fat_image.get_random_image(name=image_name, required_objects=required_objects)
         
         yaw_only_objects, max_min_dict, transformed_annotations = \
             fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
 
-        max_min_dict['ymax'] = 0.75
-        max_min_dict['ymin'] = -0.75
+        max_min_dict['ymax'] = 1
+        max_min_dict['ymin'] = -1
         max_min_dict['xmax'] = 0.5
-        max_min_dict['xmin'] = -0.1
+        max_min_dict['xmin'] = -1
+        # max_min_dict['ymax'] += 0.6
+        # max_min_dict['ymin'] -= 0.6
+        # max_min_dict['xmax'] += 0.6
+        # max_min_dict['xmin'] -= 0.6
         fat_image.search_resolution_translation = 0.08
-
+        
+        # In case of crate its hard to get camera pose sometimes as ground is not visible (RANSAC plane estimation will fail)
+        # So get camera pose from an image where ground is visible and use that
+        camera_pose = np.array([[0.757996, -0.00567911,    0.652234,   -0.779052],
+                               [0.00430481,    0.999984,  0.00370417,   -0.115213],
+                               [-0.652245, 1.32609e-16,    0.758009,     0.66139],
+                               [0,           0,           0,           1]])
+                               
         perch_annotations, stats = fat_image.visualize_perch_output(
             image_data, annotations, max_min_dict, frame='table', 
             use_external_render=0, required_object=required_objects,
-            # use_external_render=0, required_object=['coke', 'sprite', 'pepsi'],
-            # use_external_render=0, required_object=['sprite', 'coke', 'pepsi'],
-            camera_optical_frame=False, use_external_pose_list=0, gt_annotations=transformed_annotations
+            camera_optical_frame=False, use_external_pose_list=0, gt_annotations=transformed_annotations,
+            input_camera_pose=camera_pose
         )
         # print(perch_annotations)
         # print(transformed_annotations)
@@ -1178,7 +1391,7 @@ def run_sameshape():
         coco_annotation_file=annotation_file, 
         coco_image_directory=image_directory, 
         depth_factor=100, 
-        model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/SameShape/turbosquid',
+        model_dir='/media/aditya/A69AFABA9AFA85D9/Datasets/SameShape/turbosquid/models',
         model_mesh_in_mm=True,
         # model_mesh_scaling_factor=0.005,
         model_mesh_scaling_factor=1,
@@ -1189,21 +1402,22 @@ def run_sameshape():
     f_accuracy = open('accuracy.txt', "w")
     f_runtime.write("{} {} {}\n".format('name', 'expands', 'runtime'))
     
-    # required_objects = ['sprite', 'coke', 'pepsi']
-    # required_objects = ['fanta_bottle', 'coke_bottle']
-    # required_objects = ['coke_can', 'coke_bottle']
-    required_objects = ['coke_can', 'coke_bottle', 'sprite_bottle', 'pepsi_can']
+    # required_objects = ['', 'coke', 'pepsi']
+    # required_objects = ['coke_can', 'coke_bottle', 'pepsi_can']
+    # required_objects = ['coke_bottle', 'sprite_bottle']
+    required_objects = ['coke_bottle', 'sprite_bottle', 'pepsi_can', 'coke_can']
     f_accuracy.write("name ")
     for object_name in required_objects:
         f_accuracy.write("{} ".format(object_name)) 
     f_accuracy.write("\n")
 
-    # for img_i in ['00', '01', '10']:
-    # for img_i in ['14', '20', '25', '33', '38', '48']:
-    for img_i in ['32']:
-        
-        # required_objects = ['coke']
-        image_name = 'NewMap1_turbosquid/0000{}.left.png'.format(img_i)
+    # for img_i in ['14']:
+    # for img_i in ['14', '20', '25', '32', '33', '38', '48']:
+    # for img_i in range(0,13):
+    # for img_i in ['30', '31', '34', '35', '36', '37', '39', '40']:
+    # for img_i in ['15', '16', '17', '18', '19', '21', '22', '23', '24', '26', '27', '28', '29', '41', '42', '43', '44', '45', '46', '47', '49']:
+    for img_i in ['25']:
+        image_name = 'NewMap1_turbosquid/0000{}.left.png'.format(str(img_i).zfill(2))
         image_data, annotations = fat_image.get_random_image(name=image_name, required_objects=required_objects)
         
         yaw_only_objects, max_min_dict, transformed_annotations = \
@@ -1226,7 +1440,7 @@ def run_sameshape():
         # print(transformed_annotations)
 
         f_accuracy.write("{} ".format(image_data['file_name']))
-        accuracy_dict = fat_image.compare_clouds(transformed_annotations, perch_annotations)
+        accuracy_dict = fat_image.compare_clouds(transformed_annotations, perch_annotations, downsample=True, use_add_s=False)
         for object_name in required_objects:
             f_accuracy.write("{} ".format(accuracy_dict[object_name])) 
         f_accuracy.write("\n")
@@ -1294,10 +1508,12 @@ if __name__ == '__main__':
     
     ## Run Perch with Network Model
     # Dont use normalize cost and run with shifting centroid
-    # run_multiple()
+    # Run with use_lazy and use_color_cost and histogram pruning disabled
+    # run_6d()
 
     ## Run Perch with SameShape
-    # run_sameshape()
+    # Run with use_lazy and use_color_cost enabled
+    run_sameshape()
 
     ## Run Perch with crate
-    run_roman_crate()
+    # run_roman_crate()

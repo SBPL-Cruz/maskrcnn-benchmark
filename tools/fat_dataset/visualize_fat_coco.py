@@ -42,7 +42,7 @@ def render_pose(rendered_dir, count, class_name, fixed_transforms_dict, camera_i
     fixed_transform = np.transpose(np.array(fixed_transforms_dict[class_name]))
     fixed_transform[:3,3] = [i/100 for i in fixed_transform[:3,3]]
     object_world_transform = np.zeros((4,4))
-    object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1]+np.pi, rotation_angles[2], 'syxz')
+    object_world_transform[:3,:3] = RT_transform.euler2mat(rotation_angles[0],rotation_angles[1], rotation_angles[2])
     # object_world_transform[:3,:3] = RT_transform.euler2mat(0,0,0)
     # object_world_transform[:3, :3] = RT_transform.quat2mat(get_wxyz_quaternion(rotation))
     object_world_transform[:,3] = [i/100 for i in location] + [1]
@@ -78,7 +78,8 @@ def render_pose(rendered_dir, count, class_name, fixed_transforms_dict, camera_i
 
 image_directory = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/'
 # annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_2018.json'
-annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_symmetry_2018.json'
+# annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_symmetry_2018.json'
+annotation_file = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra/instances_fat_train_pose_6_obj_2018.json'
 
 example_coco = COCO(annotation_file)
 camera_intrinsics = example_coco.dataset['camera_intrinsic_settings']
@@ -110,7 +111,7 @@ else:
 
 plt.figure()
 plt.axis("off")
-plt.subplot(1,3,1)
+plt.subplot(3,3,1)
 image = io.imread(image_directory + image_data['file_name'])
 # io.imsave(os.path.join(directory, 'original.png'), image)
 
@@ -138,13 +139,13 @@ for annotation in annotations:
     print("*****{}*****".format(class_name))
     print("Recovered rotation : {}".format(xyz_rotation_angles))
     quat = annotation['quaternion_xyzw']
-    print("Actual rotation : {}".format(RT_transform.quat2euler(get_wxyz_quaternion(quat), 'syxz')))
+    print("Actual rotation : {}".format(RT_transform.quat2euler(get_wxyz_quaternion(quat))))
     # print("Actual rotation : {}".format(RT_transform.quat2euler(get_wxyz_quaternion(quat), 'rxyz')))
     rgb, depth = render_pose(directory, count, class_name, fixed_transforms_dict, 
                     camera_intrinsics, annotation['camera_pose'], xyz_rotation_angles, annotation['location'], annotation['quaternion_xyzw'])
-    plt.subplot(1,3,2)
+    plt.subplot(3,3,count+1)
     plt.imshow(rgb)    
-    plt.subplot(1,3,3)
+    plt.subplot(3,3,count+2)
     plt.imshow(depth)    
-    count += 1
+    count += 2
 plt.show()

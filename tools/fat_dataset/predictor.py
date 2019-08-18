@@ -259,7 +259,26 @@ class COCODemo(object):
         predictions = predictions[keep]
         scores = predictions.get_field("scores")
         _, idx = scores.sort(0, descending=True)
-        return predictions[idx]
+
+        # Rough way to remove double detections (Aditya)
+        # Keep each label with highest score
+        sorted_predictions = predictions[idx]
+        labels = sorted_predictions.get_field("labels")
+        labels = [self.CATEGORIES[i] for i in labels]
+        labels_found = []
+        filtered_idx = []
+        for li in range(len(labels)):
+            label = labels[li]
+            if label not in labels_found:
+                labels_found.append(label)
+                filtered_idx.append(li)
+            else:
+                continue
+        # print(labels)
+        # print(labels_found)
+        # filtered_idx = torch.tensor(filtered_idx)
+        # print(filtered_idx)
+        return sorted_predictions[filtered_idx]
 
     def compute_colors_for_labels(self, labels):
         """

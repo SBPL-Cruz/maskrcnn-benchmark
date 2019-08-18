@@ -30,15 +30,15 @@ from dipy.core.geometry import cart2sphere, sphere2cart, sphere_distance
 from lib.render_glumpy.render_py import Render_Py
 from lib.utils.mkdir_if_missing import mkdir_if_missing
 
-if False:
+if True:
     ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Datasets/fat/mixed/extra'
     SCENES = [ \
             #   "kitchen_0", "kitchen_1", "kitchen_2", "kitchen_3", 
             "kitchen_4",
             #    "kitedemo_0", "kitedemo_1", "kitedemo_2", "kitedemo_3", 
-            # "kitedemo_4",
+            "kitedemo_4",
             #    "temple_0", "temple_1", "temple_2", "temple_3", 
-            # "temple_4"  
+            "temple_4"  
             ]
 
     object_settings_file = Path(os.path.join(ROOT_DIR, "kitchen_0", "_object_settings.json"))
@@ -66,21 +66,23 @@ if False:
         "052_extra_large_clamp_16k" : [0.5, 0, 0],
         "061_foam_brick_16k" : [0.5, 0.5, 0.5],
     }
+    SELECTED_OBJECTS = ['002_master_chef_can_16k', '003_cracker_box_16k',
+        '006_mustard_bottle_16K', '010_potted_meat_can_16k',"024_bowl_16k", "025_mug_16k"]
     IMAGE_DIR_LIST = [
+            "006_mustard_bottle_16k",
             "002_master_chef_can_16k",
-            # "003_cracker_box_16k",
+            "003_cracker_box_16k",
             # "004_sugar_box_16k",
             # "005_tomato_soup_can_16k",
-            # "006_mustard_bottle_16k",
             # "007_tuna_fish_can_16k",
             # "008_pudding_box_16k",
             # "009_gelatin_box_16k",
-            # "010_potted_meat_can_16k",
+            "010_potted_meat_can_16k",
             # "011_banana_16k",
             # "019_pitcher_base_16k",
             # "021_bleach_cleanser_16k",
-            # "024_bowl_16k",
-            # "025_mug_16k",
+            "024_bowl_16k",
+            "025_mug_16k",
             # "035_power_drill_16k",
             # "036_wood_block_16k",
             # "037_scissors_16k",
@@ -88,20 +90,24 @@ if False:
             # "051_large_clamp_16k",
             # "052_extra_large_clamp_16k",
             # "061_foam_brick_16k",
-            # "",
+            "",
     ]
-    OUTFILE_NAME = 'instances_fat_train_pose_symmetry_2018'
+    # OUTFILE_NAME = 'instances_fat_train_pose_symmetry_2018'
+    # OUTFILE_NAME = 'instances_fat_train_pose_6_obj_2018'
+    OUTFILE_NAME = 'instances_fat_val_pose_6_obj_2018'
 
-if True:
+if False:
     ROOT_DIR = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed'
-    SCENES = [ "NewMap1_turbosquid" ]
+    SCENES = [ "NewMap1_turbosquid_can_only" ]
+    # SCENES = [ "NewMap1_roman" ]
 
     object_settings_file = Path(os.path.join(ROOT_DIR, SCENES[0], "_object_settings.json"))
     camera_settings_file = Path(os.path.join(ROOT_DIR, SCENES[0], "_camera_settings.json"))
     IMAGE_DIR_LIST = [
             "",
     ]
-    OUTFILE_NAME = 'instances_newmap1_turbosquid_2018'
+    OUTFILE_NAME = 'instances_newmap1_turbosquid_can_only_2018'
+    # OUTFILE_NAME = 'instances_newmap1_roman_2018'
 
 
 
@@ -111,7 +117,7 @@ print ( '  Number of points NG = %d' % ( ng ) )
 
 viewpoints_xyz = sphere_fibonacci_grid_points(ng)
 # inplane_rot_angles = np.linspace(-math.pi/4, math.pi/4, 19)
-inplane_rot_angles = np.linspace(-math.pi, math.pi, 68)
+inplane_rot_angles = np.linspace(-math.pi, math.pi, 30)
 
 
 
@@ -370,7 +376,10 @@ def main():
     if object_settings_file.is_file():
         with open(object_settings_file) as file:
             object_settings_data = json.load(file)
-            CLASSES = object_settings_data['exported_object_classes']
+            if SELECTED_OBJECTS is None:
+                CLASSES = object_settings_data['exported_object_classes']
+            else:
+                CLASSES = SELECTED_OBJECTS
             CATEGORIES = [{
                 'id': i,
                 'name': CLASSES[i].replace('_16k', '').replace('_16K', ''),
@@ -378,12 +387,14 @@ def main():
             } for i in range(0,len(CLASSES))]
 
             FIXED_TRANSFORMS = {}
-            for i in range(0,len(CLASSES)):
-                class_name = object_settings_data['exported_objects'][i]['class'].replace('_16k', '').replace('_16K', '')
+            for i in range(0,len(object_settings_data['exported_object_classes'])):
+                class_name = object_settings_data['exported_objects'][i]['class']
                 transform = object_settings_data['exported_objects'][i]['fixed_model_transform']
-                FIXED_TRANSFORMS[class_name] = transform
+                if class_name in CLASSES:
+                    class_name = class_name.replace('_16k', '').replace('_16K', '')
+                    FIXED_TRANSFORMS[class_name] = transform
                     
-        
+            # print(FIXED_TRANSFORMS)
             # SEGMENTATION_DATA =  object_settings_data['exported_objects']    
     else:
         raise Exception("Object settings file not found")
@@ -464,10 +475,15 @@ def main():
                         # all_objects_yaw_only = True
                         for i in range(0, len(label_data['objects'])):
                             class_name = label_data['objects'][i]['class']
+
+                            if class_name not in SELECTED_OBJECTS:
+                                continue
+                            # print(class_name)
                             class_bounding_box = label_data['objects'][i]['bounding_box']
                             quat = label_data['objects'][i]['quaternion_xyzw']
                             
-                            angles = RT_transform.quat2euler(get_wxyz_quaternion(quat), 'syxz')
+                            angles = RT_transform.quat2euler(get_wxyz_quaternion(quat))
+                            # angles = RT_transform.quat2euler(get_wxyz_quaternion(quat), 'syxz')
                             # angles = apply_angle_symmetry(angles, SYMMETRY_INFO[class_name])
                             # This function gives angles with this convention of euler - https://en.wikipedia.org/wiki/Euler_angles#Signs_and_ranges (geometric definition)
 

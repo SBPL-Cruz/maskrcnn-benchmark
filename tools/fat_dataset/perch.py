@@ -19,39 +19,45 @@ class FATPerch():
 
     # Symmetry info for Yaw axis
     # 1 means semi-symmetry and 2 means full symmetry
-    SYMMETRY_INFO = {
-        "004_sugar_box" : 1,
-        "008_pudding_box" : 1,
-        "009_gelatin_box" : 1,
-        "010_potted_meat_can" : 1,
-        "pepsi" : 2,
-        "coke" : 2,
-        "sprite" : 2,
-        "pepsi_can" : 2,
-        "coke_can" : 2,
-        "sprite_can" : 2,
-        "coke_bottle" : 2,
-        "sprite_bottle" : 2,
-        "fanta_bottle" : 2,
-        "crate_test" : 1
-    }
+    # SYMMETRY_INFO = {
+    #     "025_mug" : 0,
+    #     "004_sugar_box" : 1,
+    #     "008_pudding_box" : 1,
+    #     "009_gelatin_box" : 1,
+    #     "010_potted_meat_can" : 1,
+    #     "024_bowl" : 2,
+    #     "003_cracker_box" : 1,
+    #     "002_master_chef_can" : 2,
+    #     "006_mustard_bottle" : 1,
+    #     "pepsi" : 2,
+    #     "coke" : 2,
+    #     "sprite" : 2,
+    #     "pepsi_can" : 2,
+    #     "coke_can" : 2,
+    #     "sprite_can" : 2,
+    #     "coke_bottle" : 2,
+    #     "sprite_bottle" : 2,
+    #     "fanta_bottle" : 2,
+    #     "crate_test" : 1
+    # }
 
     def __init__(
-            self, params=None, input_image_files=None, camera_params=None, object_names=None, output_dir_name=None,
-            models_root=None, model_params=None
+            self, params=None, input_image_files=None, camera_params=None, object_names_to_id=None, output_dir_name=None,
+            models_root=None, model_params=None, symmetry_info=None
         ):
         self.PERCH_EXEC = subprocess.check_output("catkin_find sbpl_perception perch_fat".split(" ")).decode("utf-8").rstrip().lstrip()
         rospack = rospkg.RosPack()
         self.PERCH_ROOT = rospack.get_path('sbpl_perception')
         PERCH_ENV_CONFIG = "{}/config/pr2_env_config.yaml".format(self.PERCH_ROOT)
         PERCH_PLANNER_CONFIG = "{}/config/pr2_planner_config.yaml".format(self.PERCH_ROOT)
+        self.SYMMETRY_INFO = symmetry_info
         # PERCH_YCB_OBJECTS = "{}/config/roman_objects.xml".format(self.PERCH_ROOT)
 
         # aligned_cm textured.ply models are color and have axis according to FAT dataset - use when running perch with network
         # MODELS_ROOT = "{}/data/YCB_Video_Dataset/aligned_cm".format(self.PERCH_ROOT)
 
         # modes textured.ply models are color models with original YCB axis - use when using perch without network
-        self.object_names = object_names
+        self.object_names_to_id = object_names_to_id
 
         self.load_ros_param_from_file(PERCH_ENV_CONFIG)
         self.load_ros_param_from_file(PERCH_PLANNER_CONFIG)
@@ -61,7 +67,9 @@ class FATPerch():
         
         self.set_ros_param_from_dict(input_image_files)
         self.set_ros_param_from_dict(camera_params)
-        self.set_object_model_params(object_names, models_root, model_params)
+
+        # object_names = list(self.object_names_to_id.keys())
+        self.set_object_model_params(params['required_object'], models_root, model_params)
         self.output_dir_name = output_dir_name
         # self.launch_ros_node(PERCH_YCB_OBJECTS)
         # self.run_perch_node(PERCH_EXEC)
@@ -135,7 +143,7 @@ class FATPerch():
             annotations.append({
                             'location' : [location[0] * 100, location[1] * 100, location[2] * 100],
                             'quaternion_xyzw' : quaternion,
-                            'category_id' : self.object_names.index(lines[i].rstrip()),
+                            'category_id' : self.object_names_to_id[lines[i].rstrip()],
                             'transform_matrix' : transform_matrix,
                             'preprocessing_transform_matrix' : preprocessing_transform_matrix,
                             'id' : i%13
