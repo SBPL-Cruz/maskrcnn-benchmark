@@ -48,8 +48,10 @@ class FATPerch():
         self.PERCH_EXEC = subprocess.check_output("catkin_find sbpl_perception perch_fat".split(" ")).decode("utf-8").rstrip().lstrip()
         rospack = rospkg.RosPack()
         self.PERCH_ROOT = rospack.get_path('sbpl_perception')
-        PERCH_ENV_CONFIG = "{}/config/pr3_env_config.yaml".format(self.PERCH_ROOT)
-        PERCH_PLANNER_CONFIG = "{}/config/pr3_planner_config.yaml".format(self.PERCH_ROOT)
+        PERCH_ENV_CONFIG = "{}/config/pr2_env_config.yaml".format(self.PERCH_ROOT)
+        PERCH_PLANNER_CONFIG = "{}/config/pr2_planner_config.yaml".format(self.PERCH_ROOT)
+        # PERCH_ENV_CONFIG = "{}/config/pr3_env_config.yaml".format(self.PERCH_ROOT)
+        # PERCH_PLANNER_CONFIG = "{}/config/pr3_planner_config.yaml".format(self.PERCH_ROOT)
         self.SYMMETRY_INFO = symmetry_info
         # PERCH_YCB_OBJECTS = "{}/config/roman_objects.xml".format(self.PERCH_ROOT)
 
@@ -64,7 +66,7 @@ class FATPerch():
         self.use_external_pose_list = params['use_external_pose_list']
 
         self.set_ros_param_from_dict(params)
-        
+
         self.set_ros_param_from_dict(input_image_files)
         self.set_ros_param_from_dict(camera_params)
 
@@ -78,7 +80,7 @@ class FATPerch():
         command = "rosparam load {}".format(param_file_path)
         print(command)
         subprocess.call(command, shell=True)
-    
+
     def set_ros_param(self, param, value):
         command = 'rosparam set {} "{}"'.format(param, value)
         print(command)
@@ -113,9 +115,9 @@ class FATPerch():
                 1
             ])
         self.set_ros_param('model_bank', params)
-        
+
     def run_perch_node(self, model_poses_file):
-        command = "{}/mpirun --use-hwthread-cpus -n 6 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
+        command = "{}/mpirun --mca mpi_yield_when_idle 1 --use-hwthread-cpus -n 6 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
         print("Running command : {}".format(command))
         # print(subprocess.check_output(command.split(" ")))
         # output = subprocess.check_output(command, shell=True).decode("utf-8")
@@ -137,9 +139,9 @@ class FATPerch():
             transform_matrix = np.zeros((4,4))
             preprocessing_transform_matrix = np.zeros((4,4))
             for l_t in range(4, 8) :
-                transform_matrix[l_t - 4,:] = list(map(float, lines[i+l_t].rstrip().split())) 
+                transform_matrix[l_t - 4,:] = list(map(float, lines[i+l_t].rstrip().split()))
             for l_t in range(9, 13) :
-                preprocessing_transform_matrix[l_t - 9,:] = list(map(float, lines[i+l_t].rstrip().split())) 
+                preprocessing_transform_matrix[l_t - 9,:] = list(map(float, lines[i+l_t].rstrip().split()))
             annotations.append({
                             'location' : [location[0] * 100, location[1] * 100, location[2] * 100],
                             'quaternion_xyzw' : quaternion,
@@ -161,4 +163,3 @@ class FATPerch():
         if model_poses_file is not None:
             copy(model_poses_file, os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name))
         return annotations, stats
-
