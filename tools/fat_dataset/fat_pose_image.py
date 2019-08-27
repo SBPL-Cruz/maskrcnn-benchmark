@@ -1040,11 +1040,25 @@ class FATImage:
         from plyfile import PlyData, PlyElement
         import scipy
         from sklearn.metrics import pairwise_distances_chunked, pairwise_distances_argmin_min
-        result_dict = {}
+        result_add_dict = {}
+        result_add_s_dict = {}
         for i in range(len(annotations_2)):
             annotation_2 = annotations_2[i]
+
+            # Find matching annotation from ground truth
             annotation_1 = [annotations_1[j] for j in range(len(annotations_1)) if annotation_2['category_id'] == annotations_1[j]['category_id']]
-            annotation_1 = annotation_1[0]
+            # annotation_1 = annotation_1[0]
+
+            # There might two occurences of same category, take ground truth closer to prediction
+            # TODO think of better ways
+            min_ann_dist = 1000
+            for ann in annotation_1:
+                dist = np.linalg.norm(np.array(ann['location'])-np.array(annotation_2['location']))
+                if dist < min_ann_dist:
+                    min_ann_dist = dist
+                    min_ann = ann
+            
+            annotation_1 = min_ann
 
             object_name = self.category_id_to_names[annotation_1['category_id']]['name']
 
@@ -1083,15 +1097,20 @@ class FATImage:
                 use_fixed_transform=False
             )
             transformed_cloud_1 = np.matmul(total_transform_1, np.transpose(cloud))
-            # l = transformed_cloud_1[:,3]
 
             # Get predicted transform matrix
             total_transform_2 = annotation_2['transform_matrix']
             transformed_cloud_2 = np.matmul(total_transform_2, np.transpose(cloud))
-            # l = transformed_cloud_2[:,3]
+            
+            # Mean of corresponding points
+            mean_dist = np.linalg.norm(transformed_cloud_1-transformed_cloud_2, axis=0)
+            mean_dist_add = np.sum(mean_dist)/cloud.shape[0]
+            print("Average pose distance - ADD (in m) : {}".format(mean_dist_add))
+            result_add_dict[object_name] = mean_dist_add
 
-            if self.symmetry_info[annotation_1_cat] == 2 and use_add_s:
-                # Do ADD-S for symmetric objects
+            # if self.symmetry_info[annotation_1_cat] == 2 or use_add_s:
+            if use_add_s:
+                # Do ADD-S for symmetric objects or every object if true
                 transformed_cloud_1 = np.transpose(transformed_cloud_1)[:,:3]
                 transformed_cloud_2 = np.transpose(transformed_cloud_2)[:,:3]
                 # For below func matrix should be samples x features
@@ -1099,16 +1118,12 @@ class FATImage:
                     transformed_cloud_1, transformed_cloud_2, metric='euclidean', metric_kwargs={'n_jobs':6}
                 )
                 # Mean of nearest points
-                mean_dist = np.mean(pairwise_distances[1])
-            else:
-                # Mean of corresponding points
-                mean_dist = np.linalg.norm(transformed_cloud_1-transformed_cloud_2, axis=0)
-                mean_dist = np.sum(mean_dist)/cloud.shape[0]
+                mean_dist_add_s = np.mean(pairwise_distances[1])
+                print("Average pose distance - ADD-S (in m) : {}".format(mean_dist_add_s))
+                result_add_s_dict[object_name] = mean_dist_add_s
 
-            print("Average pose distance (in m) : {}".format(mean_dist))
-            result_dict[object_name] = mean_dist
 
-        return result_dict
+        return result_add_dict, result_add_s_dict
 
             # scaling_transform = np.zeros((4,4))
             # scaling_transform[3,3] = 1
@@ -1228,18 +1243,17 @@ def run_6d():
     required_objects = fat_image.category_names
     f_accuracy.write("name ")
     for object_name in required_objects:
-        f_accuracy.write("{} ".format(object_name)) 
+        f_accuracy.write("{}-add {}-adds ".format(object_name, object_name)) 
     f_accuracy.write("\n")
 
-    # couldnt find solution - 14 - occlusion is not possible to solve i think
-    skip_list = ['kitchen_4/000006.left.jpg', 'kitchen_4/000014.left.jpg']
-    # ugly looking - 3,4
-    for img_i in range(0,26):
-    # for img_i in [0]:
-    # for img_i in [11]:
-        
+    # couldnt find solution - 14 - occlusion is not possible to solve i think, 152 has high occlusion and 4 objects
+    skip_list = ['kitchen_4/000006.left.jpg', 'kitchen_4/000014.left.jpg', 'kitchen_4/000169.left.jpg', 'kitchen_4/000177.left.jpg']
+    # for img_i in range(0,100):    
+    # for img_i in range(100,150):    
+    # for img_i in range(155,177):
+    for img_i in [00]:
         # Get Image
-        image_name = 'kitchen_4/0000{}.left.jpg'.format(str(img_i).zfill(2))
+        image_name = 'kitchen_4/00{}.left.jpg'.format(str(img_i).zfill(4))
         if image_name in skip_list:
             continue
         # image_data, annotations = fat_image.get_random_image(name='{}_16k/kitchen_4/000005.left.jpg'.format(category_name))
@@ -1288,7 +1302,7 @@ def run_6d():
             # Run perch on written poses
             perch_annotations, stats = fat_image.visualize_perch_output(
                 image_data, model_annotations, max_min_dict, frame='camera', 
-                # use_external_render=0, required_object=[labels[0]],
+                # use_external_render=0, required_object=[labels[1]],
                 use_external_render=0, required_object=labels,
                 camera_optical_frame=False, use_external_pose_list=1,
                 # model_poses_file=model_poses_file, use_centroid_shifting=0,
@@ -1298,12 +1312,12 @@ def run_6d():
 
             # # # Compare Poses by applying to model and computing distance
             f_accuracy.write("{},".format(image_data['file_name']))
-            accuracy_dict = fat_image.compare_clouds(annotations, perch_annotations)
+            add_dict, add_s_dict = fat_image.compare_clouds(annotations, perch_annotations, use_add_s=True)
             for object_name in required_objects:
-                if object_name in accuracy_dict:
-                    f_accuracy.write("{},".format(accuracy_dict[object_name])) 
+                if (object_name in add_dict) and (object_name in add_s_dict):
+                    f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name])) 
                 else:
-                    f_accuracy.write(" ,") 
+                    f_accuracy.write(" , ,") 
             f_accuracy.write("\n")
             f_runtime.write("{} {} {}\n".format(image_data['file_name'], stats['expands'], stats['runtime']))
 
@@ -1336,7 +1350,7 @@ def run_roman_crate():
     # f_accuracy.write("\n")
 
 
-    for img_i in range(0,25):
+    for img_i in range(0,13):
     # for img_i in [16, 17, 19, 22]:
         
         # required_objects = ['coke']
@@ -1509,11 +1523,11 @@ if __name__ == '__main__':
     ## Run Perch with Network Model
     # Dont use normalize cost and run with shifting centroid
     # Run with use_lazy and use_color_cost and histogram pruning disabled
-    # run_6d()
+    run_6d()
 
     ## Run Perch with SameShape
     # Run with use_lazy and use_color_cost enabled
-    run_sameshape()
+    # run_sameshape()
 
     ## Run Perch with crate
     # run_roman_crate()
