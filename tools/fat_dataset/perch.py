@@ -12,8 +12,8 @@ from shutil import copy
 
 class FATPerch():
     # Runs perch on single image
-    # MPI_BIN_ROOT = "/usr/bin"
-    MPI_BIN_ROOT = "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/openmpi-4.0.0/install/bin"
+    MPI_BIN_ROOT = "/usr/bin"
+    # MPI_BIN_ROOT = "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/openmpi-4.0.0/install/bin"
     # OUTPUT_POSES_FILE = 'output_perch_poses.txt'
     # OUTPUT_STATS_FILE = 'output_perch_stats.txt'
 
@@ -64,7 +64,7 @@ class FATPerch():
         self.use_external_pose_list = params['use_external_pose_list']
 
         self.set_ros_param_from_dict(params)
-        
+
         self.set_ros_param_from_dict(input_image_files)
         self.set_ros_param_from_dict(camera_params)
 
@@ -78,7 +78,7 @@ class FATPerch():
         command = "rosparam load {}".format(param_file_path)
         print(command)
         subprocess.call(command, shell=True)
-    
+
     def set_ros_param(self, param, value):
         command = 'rosparam set {} "{}"'.format(param, value)
         print(command)
@@ -113,9 +113,9 @@ class FATPerch():
                 1
             ])
         self.set_ros_param('model_bank', params)
-        
+
     def run_perch_node(self, model_poses_file):
-        command = "{}/mpirun --use-hwthread-cpus -n 6 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
+        command = "{}/mpirun --mca mpi_yield_when_idle 1 --use-hwthread-cpus -n 10 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
         print("Running command : {}".format(command))
         # print(subprocess.check_output(command.split(" ")))
         # output = subprocess.check_output(command, shell=True).decode("utf-8")
@@ -137,9 +137,9 @@ class FATPerch():
             transform_matrix = np.zeros((4,4))
             preprocessing_transform_matrix = np.zeros((4,4))
             for l_t in range(4, 8) :
-                transform_matrix[l_t - 4,:] = list(map(float, lines[i+l_t].rstrip().split())) 
+                transform_matrix[l_t - 4,:] = list(map(float, lines[i+l_t].rstrip().split()))
             for l_t in range(9, 13) :
-                preprocessing_transform_matrix[l_t - 9,:] = list(map(float, lines[i+l_t].rstrip().split())) 
+                preprocessing_transform_matrix[l_t - 9,:] = list(map(float, lines[i+l_t].rstrip().split()))
             annotations.append({
                             'location' : [location[0] * 100, location[1] * 100, location[2] * 100],
                             'quaternion_xyzw' : quaternion,
@@ -161,4 +161,3 @@ class FATPerch():
         if model_poses_file is not None:
             copy(model_poses_file, os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name))
         return annotations, stats
-
