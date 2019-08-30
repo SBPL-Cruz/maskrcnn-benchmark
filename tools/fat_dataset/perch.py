@@ -43,7 +43,7 @@ class FATPerch():
 
     def __init__(
             self, params=None, input_image_files=None, camera_params=None, object_names_to_id=None, output_dir_name=None,
-            models_root=None, model_params=None, symmetry_info=None
+            models_root=None, model_params=None, symmetry_info=None, read_results_only=False
         ):
         self.PERCH_EXEC = subprocess.check_output("catkin_find sbpl_perception perch_fat".split(" ")).decode("utf-8").rstrip().lstrip()
         rospack = rospkg.RosPack()
@@ -60,19 +60,21 @@ class FATPerch():
 
         # modes textured.ply models are color models with original YCB axis - use when using perch without network
         self.object_names_to_id = object_names_to_id
-
-        self.load_ros_param_from_file(PERCH_ENV_CONFIG)
-        self.load_ros_param_from_file(PERCH_PLANNER_CONFIG)
-        self.use_external_pose_list = params['use_external_pose_list']
-
-        self.set_ros_param_from_dict(params)
-
-        self.set_ros_param_from_dict(input_image_files)
-        self.set_ros_param_from_dict(camera_params)
-
-        # object_names = list(self.object_names_to_id.keys())
-        self.set_object_model_params(params['required_object'], models_root, model_params)
         self.output_dir_name = output_dir_name
+
+        if read_results_only == False:
+            self.load_ros_param_from_file(PERCH_ENV_CONFIG)
+            self.load_ros_param_from_file(PERCH_PLANNER_CONFIG)
+            self.use_external_pose_list = params['use_external_pose_list']
+
+            self.set_ros_param_from_dict(params)
+
+            self.set_ros_param_from_dict(input_image_files)
+            self.set_ros_param_from_dict(camera_params)
+
+            # object_names = list(self.object_names_to_id.keys())
+            self.set_object_model_params(params['required_object'], models_root, model_params)
+
         # self.launch_ros_node(PERCH_YCB_OBJECTS)
         # self.run_perch_node(PERCH_EXEC)
 
@@ -116,6 +118,39 @@ class FATPerch():
             ])
         self.set_ros_param('model_bank', params)
 
+    def read_pose_results(self):
+        annotations = []
+        f = open(os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name, 'output_poses.txt'), "r")
+        lines = f.readlines()
+        for i in np.arange(0, len(lines), 13):
+            location = list(map(float, lines[i+1].rstrip().split()[1:]))
+            quaternion = list(map(float, lines[i+2].rstrip().split()[1:]))
+            transform_matrix = np.zeros((4,4))
+            preprocessing_transform_matrix = np.zeros((4,4))
+            for l_t in range(4, 8) :
+                transform_matrix[l_t - 4,:] = list(map(float, lines[i+l_t].rstrip().split()))
+            for l_t in range(9, 13) :
+                preprocessing_transform_matrix[l_t - 9,:] = list(map(float, lines[i+l_t].rstrip().split()))
+            annotations.append({
+                            'location' : [location[0] * 100, location[1] * 100, location[2] * 100],
+                            'quaternion_xyzw' : quaternion,
+                            'category_id' : self.object_names_to_id[lines[i].rstrip()],
+                            'transform_matrix' : transform_matrix,
+                            'preprocessing_transform_matrix' : preprocessing_transform_matrix,
+                            'id' : i%13
+                        })
+        f.close()
+
+        f = open(os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name, 'output_stats.txt'), "r")
+        stats = {}
+        lines = f.readlines()
+        stats_from_file = list(map(float, lines[2].rstrip().split()))
+        stats['expands'] = stats_from_file[2]
+        stats['runtime'] = stats_from_file[3]
+        f.close()
+
+        return annotations, stats
+
     def run_perch_node(self, model_poses_file):
         command = "{}/mpirun --mca mpi_yield_when_idle 1 --use-hwthread-cpus -n 6 {} {}".format(self.MPI_BIN_ROOT, self.PERCH_EXEC, self.output_dir_name)
         print("Running command : {}".format(command))
@@ -130,6 +165,7 @@ class FATPerch():
         f.close()
 
         # Get annotations from output of PERCH to get accuracy
+        ## TODO use new function
         annotations = []
         f = open(os.path.join(self.PERCH_ROOT, 'visualization', self.output_dir_name, 'output_poses.txt'), "r")
         lines = f.readlines()
