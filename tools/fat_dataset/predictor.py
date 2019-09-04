@@ -30,7 +30,8 @@ class COCODemo(object):
         masks_per_dim=2,
         min_image_size=800,
         categories=None,
-        topk_rotations=9,
+        topk_inplane_rotations=9,
+        topk_viewpoints=9,
         # viewpoints_xyz=None,
         # inplane_rotations=None,
         # fixed_transforms_dict=None,
@@ -43,7 +44,8 @@ class COCODemo(object):
         self.model.to(self.device)
         self.min_image_size = min_image_size
         self.CATEGORIES += categories
-        self.topk_rotations = topk_rotations
+        self.topk_inplane_rotations = topk_inplane_rotations
+        self.topk_viewpoints = topk_viewpoints
         # self.viewpoints_xyz = viewpoints_xyz
         # self.inplane_rotations = inplane_rotations
         # self.fixed_transforms_dict = fixed_transforms_dict
@@ -190,8 +192,8 @@ class COCODemo(object):
         inplane_rotation_scores = prediction.get_field("inplane_rotation_scores")
         if use_thresh:
             print("Using score threshold for viewpoints and inplane rotation")
-            top_viewpoint_ids = torch.topk(viewpoint_scores, self.topk_rotations, dim=1, largest=True, sorted=True)[1]
-            top_inplane_rotation_ids = torch.topk(inplane_rotation_scores, self.topk_rotations, dim=1)[1]
+            top_viewpoint_ids = torch.topk(viewpoint_scores, self.topk_viewpoints, dim=1, largest=True, sorted=True)[1]
+            top_inplane_rotation_ids = torch.topk(inplane_rotation_scores, self.topk_inplane_rotations, dim=1)[1]
             print(top_viewpoint_ids)
             # top_viewpoint_scores = viewpoint_scores > 0.01
             # top_inplane_rotation_scores = inplane_rotation_scores > 0.1
