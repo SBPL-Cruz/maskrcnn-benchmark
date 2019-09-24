@@ -170,6 +170,7 @@ class FATImage:
         image_ids = self.example_coco.getImgIds(catIds=self.category_ids)
         print("Number of images : {}".format(len(image_ids)))
         copied_camera = False
+        non_obj_images = 0
         for i in trange(len(self.image_ids)):
             image_data = self.example_coco.loadImgs(self.image_ids[i])[0]
             color_img_path = os.path.join(self.coco_image_directory, image_data['file_name'])
@@ -192,6 +193,12 @@ class FATImage:
                     copy(camera_file_path, destination)
                     copy(object_file_path, destination)
                     copied_camera = True
+            elif non_obj_images < 3000 and np.random.rand() < 0.2:
+                # Need non-object images for DOPE training
+                copy(color_img_path, os.path.join(destination, self.get_clean_name(image_data['file_name']) + ".jpg"))
+                copy(annotation_file_path, os.path.join(destination, self.get_clean_name(image_data['file_name']) + ".json"))
+                non_obj_images += 1
+
 
 
     def save_yaw_only_dataset(self, scene='all'):
@@ -931,8 +938,8 @@ class FATImage:
             min_image_size=args['min_image_size'],
             categories = self.category_names,
             # topk_rotations=9
-            topk_viewpoints=7,
-            topk_inplane_rotations=2
+            topk_viewpoints=3,
+            topk_inplane_rotations=3
         )
 
     def visualize_model_output(self, image_data, use_thresh=False, use_centroid=True, print_poses=True):
@@ -976,12 +983,15 @@ class FATImage:
         color_img = cv2.imread(color_img_path)
         composite, mask_list, rotation_list, centroids_2d, boxes, overall_binary_mask \
                 = self.coco_demo.run_on_opencv_image(color_img, use_thresh=use_thresh)
+        composite_image_path = 'model_outputs/mask_{}.png'.format(self.get_clean_name(image_data['file_name']))
+        cv2.imwrite(composite_image_path, composite)
 
         # depth_img_path = color_img_path.replace('.jpg', '.depth.png')
         depth_img_path = self.get_depth_img_path(color_img_path)
         depth_image = cv2.imread(depth_img_path, cv2.IMREAD_ANYDEPTH)
         predicted_mask_path = os.path.join(os.path.dirname(depth_img_path), os.path.splitext(os.path.basename(color_img_path))[0] + '.predicted_mask.png')
-        cv2.imwrite(predicted_mask_path, overall_binary_mask)
+        if print_poses:
+            cv2.imwrite(predicted_mask_path, overall_binary_mask)
 
         top_viewpoint_ids = rotation_list['top_viewpoint_ids']
         top_inplane_rotation_ids = rotation_list['top_inplane_rotation_ids']
@@ -1016,6 +1026,7 @@ class FATImage:
         print("Predicted mask path : {}".format(predicted_mask_path))
         img_list = []
         annotations = []
+        top_model_annotations = []
 
         depth_range = []
         if use_thresh == False:
@@ -1057,6 +1068,7 @@ class FATImage:
                 # rendered_dir = os.path.join(self.rendered_root_dir, label)
                 # mkdir_if_missing(rendered_dir)
                 # rendered_pose_list_out = []
+                top_prediction_recorded = False
                 for viewpoint_id in top_viewpoint_ids[box_id, :]:
                     for inplane_rotation_id in top_inplane_rotation_ids[box_id, :]:
                 # for viewpoint_id, inplane_rotation_id in zip(top_viewpoint_ids[box_id, :],top_inplane_rotation_ids[box_id, :]):
@@ -1087,6 +1099,15 @@ class FATImage:
                             grid_i += 1
 
                         quaternion =  get_xyzw_quaternion(RT_transform.euler2quat(phi, theta, inplane_rotation_angle).tolist())
+                        if not top_prediction_recorded:
+                            top_model_annotations.append({
+                                'location' : (centroid_world_point*100).tolist(),
+                                'quaternion_xyzw' : quaternion,
+                                'category_id' : self.category_names_to_id[label],
+                                'id' : grid_i
+                            })
+                            top_prediction_recorded = True
+
                         if use_centroid:
                             # Collect final annotations with centroid
                             annotations.append({
@@ -1101,10 +1122,10 @@ class FATImage:
 
                 use_xy = False
                 if label == "010_potted_meat_can" or label == "025_mug":
-                    resolution = 0.03
+                    resolution = 0.02
                     print("Using lower z resolution for smaller objects : {}".format(resolution))
                 else:
-                    resolution = 0.05
+                    resolution = 0.04
                     print("Using higher z resolution for larger objects : {}".format(resolution))
 
                 # resolution = 0.05
@@ -1146,7 +1167,7 @@ class FATImage:
             )
             plt.close(fig)
         # plt.show()
-        return labels, annotations, model_poses_file, predicted_mask_path
+        return labels, annotations, model_poses_file, predicted_mask_path, top_model_annotations
 
     def init_dope_node(self):
         # if '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/DOPE/catkin_ws/devel/lib/python2.7/dist-packages' not in sys.path:
@@ -1201,10 +1222,14 @@ class FATImage:
             # Find matching annotation from ground truth
             annotation_1 = [annotations_1[j] for j in range(len(annotations_1)) if annotation_2['category_id'] == annotations_1[j]['category_id']]
             # annotation_1 = annotation_1[0]
+            # print(annotation_1)
+            if len(annotation_1) == 0:
+                # Possible in DOPE where wrong object may be detected
+                return None, None
 
             # There might two occurences of same category, take ground truth closer to prediction - For 6D version
             # TODO think of better ways
-            min_ann_dist = 1000
+            min_ann_dist = 10000
             for ann in annotation_1:
                 dist = np.linalg.norm(np.array(ann['location'])-np.array(annotation_2['location']))
                 if dist < min_ann_dist:
@@ -1413,8 +1438,8 @@ def run_6d():
     f_runtime.write("{} {} {}\n".format('name', 'expands', 'runtime'))
 
     #filter_objects = ['010_potted_meat_can']
-    filter_objects = ['003_cracker_box']
-    # filter_objects = None
+    # filter_objects = ['003_cracker_box']
+    filter_objects = None
     required_objects = fat_image.category_names
     f_accuracy.write("name ")
     for object_name in required_objects:
@@ -1429,8 +1454,8 @@ def run_6d():
     # for img_i in range(155,177):
     #for img_i in list(range(0,100)) + list(range(100,120)) + list(range(155,177)):
     # for img_i in [138,142,153,163, 166, 349]:    
-    for img_i in [0]:    
-    # for img_i in [176]:
+    # for img_i in [0]:    
+    for img_i in range(113,114):
         # Get Image
         image_name = 'kitchen_4/00{}.left.jpg'.format(str(img_i).zfill(4))
         if image_name in skip_list:
@@ -1482,7 +1507,7 @@ def run_6d():
         # )
 
         # Run model to get multiple poses for each object
-        labels, model_annotations, model_poses_file, predicted_mask_path = \
+        labels, model_annotations, model_poses_file, predicted_mask_path, top_model_annotations = \
             fat_image.visualize_model_output(image_data, use_thresh=True, use_centroid=False, print_poses=True)
 
         if True:
@@ -1492,25 +1517,33 @@ def run_6d():
                 image_data, model_annotations, frame='camera', camera_optical_frame=False, num_publish=1, write_poses=True, ros_publish=False,
             )
 
-            # Run perch on written poses
-            perch_annotations, stats = fat_image.visualize_perch_output(
-                image_data, model_annotations, max_min_dict, frame='camera', 
-                # use_external_render=0, required_object=[labels[1]],
-                use_external_render=0, required_object=labels,
-                camera_optical_frame=False, use_external_pose_list=1,
-                # model_poses_file=model_poses_file, use_centroid_shifting=0,
-                model_poses_file=model_poses_file, use_centroid_shifting=1,
-                predicted_mask_path=predicted_mask_path
-            )
+            # Run perch/ICP on written poses
+            run_perch = True
+            if run_perch:
+                perch_annotations, stats = fat_image.visualize_perch_output(
+                    image_data, model_annotations, max_min_dict, frame='camera', 
+                    # use_external_render=0, required_object=[labels[1]],
+                    use_external_render=0, required_object=labels,
+                    camera_optical_frame=False, use_external_pose_list=1,
+                    # model_poses_file=model_poses_file, use_centroid_shifting=0,
+                    model_poses_file=model_poses_file, use_centroid_shifting=1,
+                    predicted_mask_path=predicted_mask_path
+                )
+            else:
+                perch_annotations = top_model_annotations
+                stats = None
+
             f_accuracy.write("{},".format(image_data['file_name']))            
-            if perch_annotations is not None and stats is not None:
+            if perch_annotations is not None:
                 # # # Compare Poses by applying to model and computing distance
-                add_dict, add_s_dict = fat_image.compare_clouds(annotations, perch_annotations, use_add_s=True)
-                for object_name in required_objects:
-                    if (object_name in add_dict) and (object_name in add_s_dict):
-                        f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name])) 
-                    else:
-                        f_accuracy.write(" , ,") 
+                add_dict, add_s_dict = fat_image.compare_clouds(annotations, perch_annotations, use_add_s=True, convert_annotation_2=not run_perch)
+                if add_dict is not None and add_s_dict is not None:
+                    for object_name in required_objects:
+                        if (object_name in add_dict) and (object_name in add_s_dict):
+                            f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name])) 
+                        else:
+                            f_accuracy.write(" , ,") 
+            if stats is not None:
                 f_runtime.write("{} {} {}".format(image_data['file_name'], stats['expands'], stats['runtime']))
             f_accuracy.write("\n")
             f_runtime.write("\n")
@@ -1800,15 +1833,11 @@ def run_dope_sameshape():
         # color_img_path = os.path.join(self.coco_image_directory, image_data['file_name'])
         # dopenode.run_on_image(color_img_path)
         dope_annotations = fat_image.visualize_dope_output(image_data)
-        # print(dope_annotations)
 
         f_accuracy.write("{},".format(image_data['file_name']))
         add_dict, add_s_dict = fat_image.compare_clouds(
             transformed_annotations, dope_annotations, downsample=True, use_add_s=True, convert_annotation_2=True
         )
-        # for object_name in required_objects:
-        #     f_accuracy.write("{} ".format(add_dict[object_name]))
-        # f_accuracy.write("\n")
 
         for object_name in required_objects:
             if (object_name in add_dict) and (object_name in add_s_dict):
@@ -1846,7 +1875,8 @@ def run_dope_6d():
     # required_objects = ['7up_can', 'sprite_can', 'pepsi_can', 'coke_can']
     # required_objects = ['coke_can', 'pepsi_can']
     required_objects = fat_image.category_names
-    # filter_objects = ['006_mustard_bottle']
+    # filter_objects = ["003_cracker_box","010_potted_meat_can", "002_master_chef_can", '006_mustard_bottle', "025_mug"]
+    # filter_objects = ["010_potted_meat_can", "002_master_chef_can", '006_mustard_bottle']
     filter_objects = None
     f_accuracy.write("name ")
     # for object_name in required_objects:
@@ -1860,7 +1890,7 @@ def run_dope_6d():
     fat_image.init_dope_node()
     skip_list = ['kitchen_4/000006.left.jpg', 'kitchen_4/000014.left.jpg', 'kitchen_4/000169.left.jpg', 'kitchen_4/000177.left.jpg']
 
-    for img_i in range(0,200):
+    for img_i in range(0,2000):
     # for img_i in [5]:
         image_name = 'kitchen_4/00{}.left.jpg'.format(str(img_i).zfill(4))
         if image_name in skip_list:
@@ -1879,25 +1909,23 @@ def run_dope_6d():
                 continue
 
         yaw_only_objects, max_min_dict, transformed_annotations = \
-            fat_image.visualize_pose_ros(image_data, annotations, frame='camera', camera_optical_frame=False)
+            fat_image.visualize_pose_ros(image_data, annotations, frame='camera', camera_optical_frame=False, ros_publish=False, num_publish=1)
 
 
         dope_annotations = fat_image.visualize_dope_output(image_data)
-        # print(dope_annotations)
+
 
         f_accuracy.write("{},".format(image_data['file_name']))
         add_dict, add_s_dict = fat_image.compare_clouds(
             transformed_annotations, dope_annotations, downsample=True, use_add_s=True, convert_annotation_2=True
         )
-        # for object_name in required_objects:
-        #     f_accuracy.write("{} ".format(add_dict[object_name]))
-        # f_accuracy.write("\n")
 
-        for object_name in required_objects:
-            if (object_name in add_dict) and (object_name in add_s_dict):
-                f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name])) 
-            else:
-                f_accuracy.write(" , ,") 
+        if add_dict is not None and add_s_dict is not None:
+            for object_name in required_objects:
+                if (object_name in add_dict) and (object_name in add_s_dict):
+                    f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name])) 
+                else:
+                    f_accuracy.write(" , ,") 
         f_accuracy.write("\n")
             
         # yaw_only_objects, max_min_dict, transformed_annotations = \
@@ -1994,5 +2022,5 @@ if __name__ == '__main__':
     # )
     # fat_image.get_database_stats()
 
-    # fat_image.copy_database("/media/aditya/A69AFABA9AFA85D9/Datasets/fat/024_bowl", "024_bowl")
+    # fat_image.copy_database("/media/aditya/A69AFABA9AFA85D9/Datasets/fat/025_mug", "025_mug")
 
