@@ -25,8 +25,8 @@ import time
 ROS_PYTHON2_PKG_PATH = ['/opt/ros/kinetic/lib/python2.7/dist-packages',
                             '/usr/local/lib/python2.7/dist-packages/',
                             '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/DOPE/catkin_ws/devel/lib/python2.7/dist-packages']
-ROS_PYTHON3_PKG_PATH = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/ros_python3_ws/devel/lib/python3/dist-packages'
-# ROS_PYTHON3_PKG_PATH = '/media/sbpl/Data/Aditya/code/ros_python3_ws/devel/lib/python3/dist-packages'
+# ROS_PYTHON3_PKG_PATH = '/media/aditya/A69AFABA9AFA85D9/Cruzr/code/ros_python3_ws/devel/lib/python3/dist-packages'
+ROS_PYTHON3_PKG_PATH = '/media/sbpl/Data/Aditya/code/ros_python3_ws/devel/lib/python3/dist-packages'
 # ROS_PYTHON3_PKG_PATH = '/home/jessy/projects/ros_python3_ws/install/lib/python3/dist-packages'
 
 class FATImage:
@@ -756,7 +756,7 @@ class FATImage:
 
     def read_perch_output(self, output_dir_name):
         from perch import FATPerch
-    
+
         fat_perch = FATPerch(
             object_names_to_id=self.category_names_to_id,
             output_dir_name=output_dir_name,
@@ -1116,7 +1116,7 @@ class FATImage:
         # load_ros_param_from_file(config_2)
         rospy.set_param('camera_info_url', 'package://dope/config/camera_info.yaml')
         mkdir_if_missing("dope_outputs")
-        
+
         self.dopenode = DopeNode()
 
     def visualize_dope_output(self, image_data):
@@ -1148,7 +1148,7 @@ class FATImage:
                 if dist < min_ann_dist:
                     min_ann_dist = dist
                     min_ann = ann
-            
+
             annotation_1 = min_ann
 
             object_name = self.category_id_to_names[annotation_1['category_id']]['name']
@@ -1203,7 +1203,7 @@ class FATImage:
             else:
                 # Convert quaternion to matrix
                 total_transform_2 = self.get_object_pose_with_fixed_transform(
-                    object_name, annotation_2['location'], 
+                    object_name, annotation_2['location'],
                     RT_transform.quat2euler(get_wxyz_quaternion(annotation_2['quaternion_xyzw'])), 'rot',
                     use_fixed_transform=False
                 )
@@ -1353,16 +1353,16 @@ def run_6d():
     required_objects = fat_image.category_names
     f_accuracy.write("name ")
     for object_name in required_objects:
-        f_accuracy.write("{}-add {}-adds ".format(object_name, object_name)) 
+        f_accuracy.write("{}-add {}-adds ".format(object_name, object_name))
     f_accuracy.write("\n")
 
     # couldnt find solution - 14 - occlusion is not possible to solve i think, 152 has high occlusion and 4 objects
     skip_list = ['kitchen_4/000006.left.jpg', 'kitchen_4/000014.left.jpg', 'kitchen_4/000169.left.jpg', 'kitchen_4/000177.left.jpg']
-    # for img_i in range(0,100):    
-    # for img_i in range(100,150):    
+    # for img_i in range(0,100):
+    # for img_i in range(100,150):
     # for img_i in range(155,177):
     #for img_i in list(range(0,100)) + list(range(100,120)) + list(range(155,177)):
-    for img_i in range(95,120):    
+    for img_i in range(95,120):
     # for img_i in [176]:
         # Get Image
         image_name = 'kitchen_4/00{}.left.jpg'.format(str(img_i).zfill(4))
@@ -1372,7 +1372,7 @@ def run_6d():
         image_data, annotations = fat_image.get_random_image(
             name=image_name, required_objects=required_objects
         )
-        
+
         # Skip if required image or image name is not in dataset
         if image_data is None or annotations is None:
             continue
@@ -1423,7 +1423,7 @@ def run_6d():
 
             # Run perch on written poses
             perch_annotations, stats = fat_image.visualize_perch_output(
-                image_data, model_annotations, max_min_dict, frame='camera', 
+                image_data, model_annotations, max_min_dict, frame='camera',
                 # use_external_render=0, required_object=[labels[1]],
                 use_external_render=0, required_object=labels,
                 camera_optical_frame=False, use_external_pose_list=1,
@@ -1437,9 +1437,9 @@ def run_6d():
             add_dict, add_s_dict = fat_image.compare_clouds(annotations, perch_annotations, use_add_s=True)
             for object_name in required_objects:
                 if (object_name in add_dict) and (object_name in add_s_dict):
-                    f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name])) 
+                    f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name]))
                 else:
-                    f_accuracy.write(" , ,") 
+                    f_accuracy.write(" , ,")
             f_accuracy.write("\n")
             f_runtime.write("{} {} {}\n".format(image_data['file_name'], stats['expands'], stats['runtime']))
 
@@ -1521,14 +1521,14 @@ def run_roman_crate():
 def run_sameshape():
     ## Running on PERCH only with synthetic color dataset - shape
     # Use normalize cost to get best results
-    base_dir = "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed"
-    # base_dir = "/media/sbpl/Data/Aditya/datasets/Zed"
+    # base_dir = "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/Dataset_Synthesizer/Test/Zed"
+    base_dir = "/media/sbpl/Data/Aditya/datasets/Zed"
     image_directory = base_dir
     # annotation_file = base_dir + '/instances_newmap1_turbosquid_2018.json'
     annotation_file = base_dir + '/instances_newmap1_turbosquid_can_only_2018.json'
 
-    model_dir = "/media/aditya/A69AFABA9AFA85D9/Datasets/SameShape/turbosquid/models"    
-    # model_dir = "/media/sbpl/Data/Aditya/datasets/turbosquid/models"
+    # model_dir = "/media/aditya/A69AFABA9AFA85D9/Datasets/SameShape/turbosquid/models"
+    model_dir = "/media/sbpl/Data/Aditya/datasets/turbosquid/models"
     fat_image = FATImage(
         coco_annotation_file=annotation_file,
         coco_image_directory=image_directory,
@@ -1550,22 +1550,22 @@ def run_sameshape():
     required_objects = ['pepsi_can', 'coke_can', '7up_can', 'sprite_can']
 
     f_accuracy.write("name ")
-    
+
     for object_name in required_objects:
-        f_accuracy.write("{}-add {}-adds ".format(object_name, object_name)) 
+        f_accuracy.write("{}-add {}-adds ".format(object_name, object_name))
     f_accuracy.write("\n")
 
     # for img_i in ['14']:
     # for img_i in ['14', '20', '25', '32', '33', '38', '48']:
     read_results_only = False
     # for img_i in range(0,50):
-    for img_i in range(0,1):
+    for img_i in range(0,25):
     # for img_i in ['30', '31', '34', '35', '36', '37', '39', '40']:
     # for img_i in ['15', '16', '17', '18', '19', '21', '22', '23', '24', '26', '27', '28', '29', '41', '42', '43', '44', '45', '46', '47', '49']:
     # for img_i in list(range(0,13)) + ['30', '31', '34', '35', '36', '37', '39', '40', '15', '16', '17', '18', '19', '21', '22', '23', '24', '26', '27', '28', '29', '41', '42', '43', '44', '45', '46', '47', '49']:
-        if img_i == 10 or img_i == 14 or img_i == 15 or img_i == 18 or img_i == 20:
-            # mising in icp run
-            continue
+        # if img_i == 10 or img_i == 14 or img_i == 15 or img_i == 18 or img_i == 20:
+        #     # mising in icp run
+        #     continue
         # image_name = 'NewMap1_turbosquid/0000{}.left.png'.format(str(img_i).zfill(2))
         image_name = 'NewMap1_turbosquid_can_only/0000{}.left.png'.format(str(img_i).zfill(2))
         image_data, annotations = fat_image.get_random_image(name=image_name, required_objects=required_objects)
@@ -1573,7 +1573,7 @@ def run_sameshape():
                 fat_image.visualize_pose_ros(image_data, annotations, frame='table', camera_optical_frame=False)
 
         if read_results_only == False:
-            
+
 
             max_min_dict['ymax'] = 1.5
             max_min_dict['ymin'] = -1.5
@@ -1589,20 +1589,21 @@ def run_sameshape():
                 camera_optical_frame=False, use_external_pose_list=0, gt_annotations=transformed_annotations
             )
         else:
-            output_dir_name = os.path.join("final_comp", "no_color_lazy", fat_image.get_clean_name(image_data['file_name']))
+            # output_dir_name = os.path.join("final_comp", "no_color_lazy", fat_image.get_clean_name(image_data['file_name']))
+            output_dir_name = fat_image.get_clean_name(image_data['file_name'])
             perch_annotations, stats = fat_image.read_perch_output(output_dir_name)
-            
+
         # print(perch_annotations)
         # print(transformed_annotations)
 
         f_accuracy.write("{},".format(image_data['file_name']))
         add_dict, add_s_dict = fat_image.compare_clouds(transformed_annotations, perch_annotations, downsample=True, use_add_s=True)
-        
+
         for object_name in required_objects:
             if (object_name in add_dict) and (object_name in add_s_dict):
-                f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name])) 
+                f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name]))
             else:
-                f_accuracy.write(" , ,") 
+                f_accuracy.write(" , ,")
         f_accuracy.write("\n")
 
         f_runtime.write("{} {} {}\n".format(image_name, stats['expands'], stats['runtime']))
@@ -1638,7 +1639,7 @@ def run_sameshape_can_only():
     required_objects = ['7up_can', 'sprite_can', 'pepsi_can', 'coke_can']
     f_accuracy.write("name ")
     for object_name in required_objects:
-        f_accuracy.write("{}-add {}-adds ".format(object_name, object_name)) 
+        f_accuracy.write("{}-add {}-adds ".format(object_name, object_name))
     f_accuracy.write("\n")
 
     for img_i in range(21,25):
@@ -1668,9 +1669,9 @@ def run_sameshape_can_only():
         accuracy_dict, _ = fat_image.compare_clouds(transformed_annotations, perch_annotations, downsample=False, use_add_s=False)
         for object_name in required_objects:
             if (object_name in add_dict) and (object_name in add_s_dict):
-                f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name])) 
+                f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name]))
             else:
-                f_accuracy.write(" , ,") 
+                f_accuracy.write(" , ,")
         f_accuracy.write("\n")
 
         f_runtime.write("{} {} {}\n".format(image_name, stats['expands'], stats['runtime']))
@@ -1711,7 +1712,7 @@ def run_dope():
     # f_accuracy.write("\n")
 
     for object_name in required_objects:
-        f_accuracy.write("{}-add {}-adds ".format(object_name, object_name)) 
+        f_accuracy.write("{}-add {}-adds ".format(object_name, object_name))
     f_accuracy.write("\n")
 
     fat_image.init_dope_node()
@@ -1741,11 +1742,11 @@ def run_dope():
 
         for object_name in required_objects:
             if (object_name in add_dict) and (object_name in add_s_dict):
-                f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name])) 
+                f_accuracy.write("{},{},".format(add_dict[object_name], add_s_dict[object_name]))
             else:
-                f_accuracy.write(" , ,") 
+                f_accuracy.write(" , ,")
         f_accuracy.write("\n")
-            
+
         # yaw_only_objects, max_min_dict, transformed_annotations = \
         #     fat_image.visualize_pose_ros(image_data, dope_annotations, frame='camera', camera_optical_frame=False)
 
@@ -1816,9 +1817,9 @@ if __name__ == '__main__':
 
     ## Run Perch with SameShape
     # Run with use_lazy and use_color_cost enabled
-    # run_sameshape()
+    run_sameshape()
     # run_sameshape_can_only()
-    run_dope()
+    # run_dope()
 
     ## Run Perch with crate
     # run_roman_crate()
@@ -1838,4 +1839,3 @@ if __name__ == '__main__':
     #     models_flipped=False
     # )
     # fat_image.copy_database("/media/aditya/A69AFABA9AFA85D9/Datasets/fat_perch_6_objects")
-
