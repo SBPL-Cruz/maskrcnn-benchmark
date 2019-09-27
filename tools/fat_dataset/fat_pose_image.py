@@ -2003,11 +2003,7 @@ if __name__ == '__main__':
     # Run with use_lazy and use_color_cost enabled
     run_sameshape()
     # run_sameshape_can_only()
-<<<<<<< HEAD
-    # run_dope()
-=======
     # run_dope_sameshape()
->>>>>>> a45ee80b0a9d7f0432392b0df251d8554d04cef9
 
     ## Run Perch with crate
     # run_roman_crate()
@@ -2026,11 +2022,7 @@ if __name__ == '__main__':
     #     model_mesh_scaling_factor=1,
     #     models_flipped=False
     # )
-<<<<<<< HEAD
-    # fat_image.copy_database("/media/aditya/A69AFABA9AFA85D9/Datasets/fat_perch_6_objects")
-=======
     # fat_image.get_database_stats()
 
     # fat_image.copy_database("/media/aditya/A69AFABA9AFA85D9/Datasets/fat/025_mug", "025_mug")
 
->>>>>>> a45ee80b0a9d7f0432392b0df251d8554d04cef9
