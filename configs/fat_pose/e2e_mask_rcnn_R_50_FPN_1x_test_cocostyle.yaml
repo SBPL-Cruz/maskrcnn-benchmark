@@ -1,7 +1,8 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
   # WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/fat_trained_models/model_pose_incl_isolated.pth"
-  WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/fat_trained_models/model_47kiter_6_obj.pth"
+  # WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/fat_trained_models/model_60kiter_6_obj.pth"
+  WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/fat_trained_models/model_97kiter_6_obj.pth"
   # WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/model_final.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
