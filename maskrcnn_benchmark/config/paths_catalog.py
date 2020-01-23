@@ -204,6 +204,18 @@ class DatasetCatalog(object):
             "img_dir": "fat/mixed/extra",
             "ann_file": "fat/mixed/extra/instances_fat_val_pose_2018.json"
         },
+        "ycb_train_cocostyle": {
+            "img_dir": "YCB_Video_Dataset",
+            "ann_file": "YCB_Video_Dataset/instances_train_pose.json"
+        },
+        "ycb_syn_cocostyle": {
+            "img_dir": "YCB_Video_Dataset",
+            "ann_file": "YCB_Video_Dataset/instances_syn_pose.json"
+        },
+        "ycb_test_cocostyle": {
+            "img_dir": "YCB_Video_Dataset",
+            "ann_file": "YCB_Video_Dataset/instances_keyframe_pose.json"
+        },
     }
 
     @staticmethod
