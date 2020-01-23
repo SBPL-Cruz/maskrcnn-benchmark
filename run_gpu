@@ -2,7 +2,7 @@
 #SBATCH -N 1
 #SBATCH -p GPU
 #SBATCH --ntasks-per-node 1
-#SBATCH -t 20:00:00
+#SBATCH -t 12:00:00
 #SBATCH --gres=gpu:p100:2
 
 #echo commands to stdout
@@ -14,12 +14,8 @@ set -x
 # - all output should be stored in this directory 
 
 #run GPU program
-#conda activate maskrcnn_benchmark_new
-#conda activate /home/likhache/.conda/envs/maskrcnn_benchmark_new
 conda activate /pylon5/ir5fq3p/likhache/aditya/maskrcnn_benchmark
 cd /pylon5/ir5fq3p/likhache/aditya/fb_mask_rcnn/maskrcnn-benchmark
 which python
 export PYTHONPATH=$PYTHONPATH:/pylon5/ir5fq3p/likhache/aditya/fb_mask_rcnn/maskrcnn-benchmark
-#export PYTHONPATH=$PYTHONPATH:/pylon5/ir5fq3p/likhache/aditya/fb_mask_rcnn/maskrcnn-benchmark/maskrcnn_benchmark
-# source runme_fat_pose_train |& tee log
 source runme_fat_pose_multigpu_train |& tee log

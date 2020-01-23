@@ -198,8 +198,9 @@ class DatasetCatalog(object):
         },
         "fat_pose_2018_train_cocostyle": {
             "img_dir": "fat/mixed/extra",
-            "ann_file": "fat/mixed/extra/instances_fat_train_pose_2018.json"
+            "ann_file": "fat/mixed/extra/instances_fat_train_pose_6_obj_2018.json"
         },
+        # "ann_file": "fat/mixed/extra/instances_fat_train_pose_2018.json"
         "fat_pose_2018_val_cocostyle": {
             "img_dir": "fat/mixed/extra",
             "ann_file": "fat/mixed/extra/instances_fat_val_pose_2018.json"
