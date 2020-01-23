@@ -18,4 +18,5 @@ conda activate /pylon5/ir5fq3p/likhache/aditya/maskrcnn_benchmark
 cd /pylon5/ir5fq3p/likhache/aditya/fb_mask_rcnn/maskrcnn-benchmark
 which python
 export PYTHONPATH=$PYTHONPATH:/pylon5/ir5fq3p/likhache/aditya/fb_mask_rcnn/maskrcnn-benchmark
-source runme_fat_pose_multigpu_train |& tee log
+source runme_ycb_pose_multigpu_train |& tee log
+# source runme_fat_pose_multigpu_train |& tee log

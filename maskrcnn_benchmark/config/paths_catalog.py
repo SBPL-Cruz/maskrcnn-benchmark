@@ -215,7 +215,7 @@ class DatasetCatalog(object):
         },
         "ycb_test_cocostyle": {
             "img_dir": "YCB_Video_Dataset",
-            "ann_file": "YCB_Video_Dataset/instances_keyframe_pose.json"
+            "ann_file": "YCB_Video_Dataset/instances_val_pose.json"
         },
     }
 

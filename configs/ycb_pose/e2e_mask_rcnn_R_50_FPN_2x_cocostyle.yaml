@@ -25,8 +25,8 @@ MODEL:
     FEATURE_EXTRACTOR: "FPN2MLPFeatureExtractor"
     PREDICTOR: "FPNPredictorWithPose"
     NUM_CLASSES: 22
-    NUM_VIEWPOINTS: 1000
-    NUM_INPLANE_ROTATIONS: 68
+    NUM_VIEWPOINTS: 642
+    NUM_INPLANE_ROTATIONS: 30
   ROI_MASK_HEAD:
     POOLER_SCALES: (0.25, 0.125, 0.0625, 0.03125)
     FEATURE_EXTRACTOR: "MaskRCNNFPNFeatureExtractor"
@@ -38,8 +38,8 @@ MODEL:
   MASK_ON: True
   POSE_ON: True
 DATASETS:
-  TRAIN: ("fat_pose_2018_train_cocostyle",)
-  TEST: ("fat_pose_2018_val_cocostyle",)
+  TRAIN: ("ycb_train_cocostyle", "ycb_syn_cocostyle")
+  TEST: ("ycb_test_cocostyle",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
   NUM_WORKERS: 0
@@ -48,7 +48,7 @@ SOLVER:
   WEIGHT_DECAY: 0.0001
   STEPS: (20000,)
   # MAX_ITER: 17500
-  MAX_ITER: 50000
+  MAX_ITER: 120000
   IMS_PER_BATCH: 12
 TEST:
   IMS_PER_BATCH: 12
