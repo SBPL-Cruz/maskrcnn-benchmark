@@ -1,9 +1,6 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-  # WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/fat_trained_models/model_pose_incl_isolated.pth"
-  # WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/fat_trained_models/model_60kiter_6_obj.pth"
-  WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/fat_trained_models/model_97kiter_6_obj.pth"
-  # WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/model_final.pth"
+  WEIGHT: "/media/aditya/A69AFABA9AFA85D9/Cruzr/code/fb_mask_rcnn/maskrcnn-benchmark/ycb_trained_models/model_17500.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
   RESNETS:
@@ -23,10 +20,7 @@ MODEL:
     POOLER_SAMPLING_RATIO: 2
     FEATURE_EXTRACTOR: "FPN2MLPFeatureExtractor"
     PREDICTOR: "FPNPredictorWithPose"
-    # NUM_CLASSES: 22
-    # NUM_VIEWPOINTS: 1000
-    # NUM_INPLANE_ROTATIONS: 68
-    NUM_CLASSES: 7
+    NUM_CLASSES: 22
     NUM_VIEWPOINTS: 642
     NUM_INPLANE_ROTATIONS: 30
   ROI_MASK_HEAD:
