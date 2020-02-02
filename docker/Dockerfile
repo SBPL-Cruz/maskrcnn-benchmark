@@ -3,7 +3,7 @@ ARG CUDNN="7"
 
 FROM nvidia/cuda:${CUDA}-cudnn${CUDNN}-devel-ubuntu16.04
 
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+# RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
 # install basics
 RUN apt-get update -y \
@@ -34,13 +34,15 @@ RUN pip install ninja yacs cython matplotlib opencv-python tqdm tensorboardX
 
 # Install PyTorch 1.0 Nightly
 ARG CUDA
-RUN conda install pytorch-nightly cudatoolkit=${CUDA} -c pytorch \
+RUN conda install pytorch==1.0.0 torchvision==0.2.1 cudatoolkit=${CUDA} -c pytorch \
  && conda clean -ya
 
 # Install TorchVision master
-RUN git clone https://github.com/pytorch/vision.git \
- && cd vision \
- && python setup.py install
+# RUN git clone https://github.com/pytorch/vision.git \
+#  && cd vision \
+#  && python setup.py install
+
+RUN pip install pillow==6.2.1
 
 # install pycocotools
 RUN git clone https://github.com/cocodataset/cocoapi.git \
@@ -55,7 +57,7 @@ RUN git clone https://github.com/NVIDIA/apex.git \
 # install PyTorch Detection
 ARG FORCE_CUDA="1"
 ENV FORCE_CUDA=${FORCE_CUDA}
-RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
+RUN git clone https://github.com/sbpl-cruz/maskrcnn-benchmark.git \
  && cd maskrcnn-benchmark \
  && python setup.py build develop
 
