@@ -42,7 +42,7 @@ RUN conda install pytorch==1.0.0 torchvision==0.2.1 cudatoolkit=${CUDA} -c pytor
 #  && cd vision \
 #  && python setup.py install
 
-RUN pip install pillow==6.2.1
+RUN conda install pillow==6.1
 
 # install pycocotools
 RUN git clone https://github.com/cocodataset/cocoapi.git \
@@ -57,7 +57,7 @@ RUN git clone https://github.com/NVIDIA/apex.git \
 # install PyTorch Detection
 ARG FORCE_CUDA="1"
 ENV FORCE_CUDA=${FORCE_CUDA}
-RUN git clone https://github.com/sbpl-cruz/maskrcnn-benchmark.git \
+RUN git clone https://github.com/sbpl-cruz/maskrcnn-benchmark.git -b fat_pose_dataset_new \
  && cd maskrcnn-benchmark \
  && python setup.py build develop
 
