@@ -42,18 +42,18 @@ DATASETS:
   TEST: ("ycb_test_bbox_cocostyle",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
-  NUM_WORKERS: 0
+  NUM_WORKERS: 2
 SOLVER:
   BASE_LR: 0.002 # doubles for 2x gpu
   WEIGHT_DECAY: 0.0001
-  STEPS: (125000,)
-  MAX_ITER: 175000 # for 10 epochs, this number is for 10 for 210k images
-  # 17500 for one epoch
-  IMS_PER_BATCH: 12
-  # For P100 GPU
+  STEPS: (110000,)
+  MAX_ITER: 131250 # for 10 epochs, this number is for 10 for 210k images
+  # 13125 for one epoch
+  IMS_PER_BATCH: 16
+  # For P100 GPU, one image takes 1.9GB
 TEST:
-  IMS_PER_BATCH: 12
-  EVAL_ITER : 2500
+  IMS_PER_BATCH: 16
+  EVAL_ITER : 5000
 INPUT:
   MIN_SIZE_TRAIN: (480,)
   MAX_SIZE_TRAIN: 640
