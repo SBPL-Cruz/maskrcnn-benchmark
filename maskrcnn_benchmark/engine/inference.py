@@ -33,8 +33,8 @@ def compute_on_dataset(model, data_loader, device, timer=None):
             {img_id: result for img_id, result in zip(image_ids, output)}
         )
         count += 1
-        if count > 10:
-            break
+        # if count > 200:
+        #     break
     return results_dict
 
 

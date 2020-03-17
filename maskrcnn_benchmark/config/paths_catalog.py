@@ -217,6 +217,18 @@ class DatasetCatalog(object):
             "img_dir": "YCB_Video_Dataset",
             "ann_file": "YCB_Video_Dataset/instances_val_pose.json"
         },
+        "ycb_train_bbox_cocostyle": {
+            "img_dir": "YCB_Video_Dataset",
+            "ann_file": "YCB_Video_Dataset/instances_train_bbox_pose.json"
+        },
+        "ycb_syn_bbox_cocostyle": {
+            "img_dir": "YCB_Video_Dataset",
+            "ann_file": "YCB_Video_Dataset/instances_syn_bbox_pose.json"
+        },
+        "ycb_test_bbox_cocostyle": {
+            "img_dir": "YCB_Video_Dataset",
+            "ann_file": "YCB_Video_Dataset/instances_keyframe_bbox_pose.json"
+        },
     }
 
     @staticmethod

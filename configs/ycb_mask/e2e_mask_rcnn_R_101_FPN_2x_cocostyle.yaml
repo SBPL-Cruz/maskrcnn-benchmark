@@ -1,8 +1,8 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
+  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-101"
   BACKBONE:
-    CONV_BODY: "R-50-FPN"
+    CONV_BODY: "R-101-FPN"
   RESNETS:
     BACKBONE_OUT_CHANNELS: 256
   RPN:
@@ -23,7 +23,7 @@ MODEL:
     POOLER_SCALES: (0.25, 0.125, 0.0625, 0.03125)
     POOLER_SAMPLING_RATIO: 2
     FEATURE_EXTRACTOR: "FPN2MLPFeatureExtractor"
-    PREDICTOR: "FPNPredictorWithPose"
+    PREDICTOR: "FPNPredictor"
     NUM_CLASSES: 22
     NUM_VIEWPOINTS: 642
     NUM_INPLANE_ROTATIONS: 30
@@ -36,26 +36,26 @@ MODEL:
     RESOLUTION: 28
     SHARE_BOX_FEATURE_EXTRACTOR: False
   MASK_ON: True
-  POSE_ON: True
+  POSE_ON: False
 DATASETS:
-  TRAIN: ("ycb_train_cocostyle", "ycb_syn_cocostyle")
-  TEST: ("ycb_test_cocostyle",)
+  TRAIN: ("ycb_train_bbox_cocostyle", "ycb_syn_bbox_cocostyle")
+  TEST: ("ycb_test_bbox_cocostyle",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
   NUM_WORKERS: 0
 SOLVER:
-  BASE_LR: 0.024
+  BASE_LR: 0.002 # doubles for 2x gpu
   WEIGHT_DECAY: 0.0001
-  STEPS: (10000,)
-  MAX_ITER: 65000
-  # MAX_ITER: 120000
-  # For V100
-  IMS_PER_BATCH: 32
+  STEPS: (125000,)
+  MAX_ITER: 175000 # for 10 epochs, this number is for 10 for 210k images
+  # 17500 for one epoch
+  IMS_PER_BATCH: 12
+  # For P100 GPU
 TEST:
-  IMS_PER_BATCH: 32
-#SOLVER:
-#  BASE_LR: 0.001
-#  WEIGHT_DECAY: 0.00001
-#  STEPS: (2000,)
-#  MAX_ITER: 32000
-#  IMS_PER_BATCH: 1
+  IMS_PER_BATCH: 12
+  EVAL_ITER : 2500
+INPUT:
+  MIN_SIZE_TRAIN: (480,)
+  MAX_SIZE_TRAIN: 640
+  MIN_SIZE_TEST: 480
+  MAX_SIZE_TEST: 640

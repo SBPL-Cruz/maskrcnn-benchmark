@@ -159,11 +159,11 @@ def do_train(
         if iteration % checkpoint_period == 0:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
         
-        #if iteration % eval_period == 0 and iteration > 0:
-        #    print("ENTER VALIDATION CALCULATIONS every : {}".format(eval_period))
-        #    output = val(cfg, model, distributed=distributed)
-        #    meters.update(**output)
-        #    model.train()
+        if iteration % eval_period == 0 and iteration > 0:
+           print("ENTER VALIDATION CALCULATIONS every : {}".format(eval_period))
+           output = val(cfg, model, distributed=distributed)
+           meters.update(**output)
+           model.train()
             
         if iteration == max_iter:
             checkpointer.save("model_final", **arguments)

@@ -1,8 +1,8 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
+  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-101"
   BACKBONE:
-    CONV_BODY: "R-50-FPN"
+    CONV_BODY: "R-101-FPN"
   RESNETS:
     BACKBONE_OUT_CHANNELS: 256
   RPN:
@@ -12,8 +12,6 @@ MODEL:
     PRE_NMS_TOP_N_TEST: 1000
     POST_NMS_TOP_N_TEST: 1000
     FPN_POST_NMS_TOP_N_TEST: 1000
-    # FPN_POST_NMS_TOP_N_TRAIN: 8000
-    # FPN_POST_NMS_PER_BATCH: True
     FPN_POST_NMS_TOP_N_TRAIN: 1000
     FPN_POST_NMS_PER_BATCH: False
   ROI_HEADS:
@@ -23,7 +21,7 @@ MODEL:
     POOLER_SCALES: (0.25, 0.125, 0.0625, 0.03125)
     POOLER_SAMPLING_RATIO: 2
     FEATURE_EXTRACTOR: "FPN2MLPFeatureExtractor"
-    PREDICTOR: "FPNPredictorWithPose"
+    PREDICTOR: "FPNPredictor"
     NUM_CLASSES: 22
     NUM_VIEWPOINTS: 642
     NUM_INPLANE_ROTATIONS: 30
@@ -36,26 +34,29 @@ MODEL:
     RESOLUTION: 28
     SHARE_BOX_FEATURE_EXTRACTOR: False
   MASK_ON: True
-  POSE_ON: True
+  POSE_ON: False
 DATASETS:
-  TRAIN: ("ycb_train_cocostyle", "ycb_syn_cocostyle")
-  TEST: ("ycb_test_cocostyle",)
+  TRAIN: ("ycb_train_bbox_cocostyle", "ycb_syn_bbox_cocostyle")
+  TEST: ("ycb_test_bbox_cocostyle",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
   NUM_WORKERS: 0
 SOLVER:
-  BASE_LR: 0.024
+  BASE_LR: 0.001
   WEIGHT_DECAY: 0.0001
-  STEPS: (10000,)
-  MAX_ITER: 65000
-  # MAX_ITER: 120000
-  # For V100
-  IMS_PER_BATCH: 32
+  STEPS: (150000,) # num_iter/1.4
+  MAX_ITER: 210000 #1 epoch
+  IMS_PER_BATCH: 1
 TEST:
-  IMS_PER_BATCH: 32
-#SOLVER:
-#  BASE_LR: 0.001
-#  WEIGHT_DECAY: 0.00001
-#  STEPS: (2000,)
-#  MAX_ITER: 32000
-#  IMS_PER_BATCH: 1
+  IMS_PER_BATCH: 1
+  EVAL_ITER : 2500
+INPUT:
+  MIN_SIZE_TRAIN: (480,)
+  MAX_SIZE_TRAIN: 640
+  MIN_SIZE_TEST: 480
+  MAX_SIZE_TEST: 640
+
+
+# Num epochs calculation
+# num_iter_all (number of iteration to do whole dataset) = num_images/(num_imgs_batch)
+# num_epoch = num_iters_total/num_iter_all

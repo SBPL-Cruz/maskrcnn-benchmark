@@ -1,0 +1,2 @@
+python tools/test_net.py \
+    --config configs/ycb_mask/e2e_mask_rcnn_R_101_FPN_1x_test_cocostyle.yaml

@@ -85,10 +85,11 @@ class FastRCNNLossComputation(object):
             #     and matched_targets.has_field('inplane_rotations'):
             #     viewpoints_per_image[bg_inds] = 0
             #     viewpoints_per_image[ignore_inds] = -1
-            viewpoints.append(viewpoints_per_image)
-            #     inplane_rotations_per_image[bg_inds] = 0
-            #     inplane_rotations_per_image[ignore_inds] = -1
-            inplane_rotations.append(inplane_rotations_per_image)
+            if self.pose_on:
+                viewpoints.append(viewpoints_per_image)
+                #     inplane_rotations_per_image[bg_inds] = 0
+                #     inplane_rotations_per_image[ignore_inds] = -1
+                inplane_rotations.append(inplane_rotations_per_image)
 
 
             # compute regression targets
@@ -222,8 +223,10 @@ class FastRCNNLossComputation(object):
         )
         box_loss = box_loss / labels.numel()
 
-        return classification_loss, box_loss, viewpoint_loss, inplane_rotation_loss
-
+        if self.pose_on:
+            return classification_loss, box_loss, viewpoint_loss, inplane_rotation_loss
+        else:
+            return classification_loss, box_loss
 
 def make_roi_box_loss_evaluator(cfg):
     matcher = Matcher(

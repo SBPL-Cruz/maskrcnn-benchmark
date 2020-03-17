@@ -1,0 +1,7 @@
+cd /data/aditya/fb_mask_rcnn/maskrcnn-benchmark
+export NGPUS=4
+python -m \
+    torch.distributed.launch \
+    --nproc_per_node=$NGPUS tools/train_net.py \
+    --use-tensorboard \
+    --config configs/ycb_mask/e2e_mask_rcnn_R_101_FPN_4x_cocostyle.yaml |& tee log

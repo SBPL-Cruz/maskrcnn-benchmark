@@ -62,20 +62,32 @@ class ROIBoxHead(torch.nn.Module):
 
         loss_viewpoint, loss_inplane_rotation = None, None
 
-        loss_classifier, loss_box_reg, loss_viewpoint, loss_inplane_rotation = self.loss_evaluator(
-            [class_logits], [box_regression], [viewpoint_logits], [inplane_rotation_logits]
-        )
-        return (
-            x,
-            proposals,
-            dict(
-                loss_classifier=loss_classifier, 
-                loss_box_reg=loss_box_reg,
-                loss_viewpoint=loss_viewpoint,
-                loss_inplane_rotation=loss_inplane_rotation
-            ),
-        )
-
+        if self.cfg.MODEL.POSE_ON:
+            loss_classifier, loss_box_reg, loss_viewpoint, loss_inplane_rotation = self.loss_evaluator(
+                [class_logits], [box_regression], [viewpoint_logits], [inplane_rotation_logits]
+            )
+            return (
+                x,
+                proposals,
+                dict(
+                    loss_classifier=loss_classifier, 
+                    loss_box_reg=loss_box_reg,
+                    loss_viewpoint=loss_viewpoint,
+                    loss_inplane_rotation=loss_inplane_rotation
+                ),
+            )
+        else:
+            loss_classifier, loss_box_reg = self.loss_evaluator(
+                [class_logits], [box_regression]
+            )
+            return (
+                x,
+                proposals,
+                dict(
+                    loss_classifier=loss_classifier, 
+                    loss_box_reg=loss_box_reg,
+                ),
+            )
 
 def build_roi_box_head(cfg, in_channels):
     """
