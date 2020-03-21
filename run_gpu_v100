@@ -1,9 +1,11 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -p GPU-AI
-#SBATCH --ntasks-per-node 1
-#SBATCH -t 12:00:00
+#Comment SBATCH -p GPU
+#SBATCH --ntasks-per-node 4
+#SBATCH -t 06:00:00
 #SBATCH --gres=gpu:volta16:4
+#Comment SBATCH --gres=gpu:p100:2
 
 #echo commands to stdout
 set -x
@@ -18,4 +20,5 @@ source /etc/profile.d/modules.sh
 module load singularity
 export SINGULARITY_CACHEDIR=$SCRATCH/.singularity
 
-singularity exec -B /pylon5/ir5fq3p/likhache/aditya:/data/aditya --nv  $SCRATCH/maskrcnn_benchmark.simg runme_ycb_pose_multigpu_train
+#singularity exec -B /pylon5/ir5fq3p/likhache/aditya:/data/aditya --nv  $SCRATCH/maskrcnn_benchmark.simg 
+singularity run -B /pylon5/ir5fq3p/likhache/aditya:/data/aditya --nv  $SCRATCH/maskrcnn_benchmark_2.simg /data/aditya/fb_mask_rcnn/maskrcnn-benchmark/runme_ycb_mask_multigpu_train 4 |& tee log
