@@ -7,4 +7,4 @@ python -m \
     torch.distributed.launch \
     --nproc_per_node=$NGPUS tools/train_net.py \
     --use-tensorboard \
-    --config $CONFIG |& tee log
+    --config $CONFIG
