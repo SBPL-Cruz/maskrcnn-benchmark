@@ -59,10 +59,18 @@ def do_coco_evaluation(
             file_path = f.name
             if output_folder:
                 file_path = os.path.join(output_folder, iou_type + ".json")
+            
+            for catId in dataset.coco.getCatIds():
+                print("Doing coco_eval for catID : {}".format(catId))
+                res = evaluate_predictions_on_coco(
+                    dataset.coco, coco_results[iou_type], file_path, iou_type, catId
+                )
+                results.update(res)
             res = evaluate_predictions_on_coco(
                 dataset.coco, coco_results[iou_type], file_path, iou_type
             )
             results.update(res)
+
     logger.info(results)
     check_expected_results(results, expected_results, expected_results_sigma_tol)
     if output_folder:
@@ -356,7 +364,7 @@ def evaluate_box_proposals(
 
 
 def evaluate_predictions_on_coco(
-    coco_gt, coco_results, json_result_file, iou_type="bbox"
+    coco_gt, coco_results, json_result_file, iou_type="bbox", catId=None
 ):
     import json
 
@@ -370,6 +378,8 @@ def evaluate_predictions_on_coco(
 
     # coco_dt = coco_gt.loadRes(coco_results)
     coco_eval = COCOeval(coco_gt, coco_dt, iou_type)
+    if catId is not None:
+        coco_eval.params.catIds = [catId]
     coco_eval.evaluate()
     coco_eval.accumulate()
     coco_eval.summarize()
@@ -413,10 +423,18 @@ class COCOResults(object):
         assert isinstance(coco_eval, COCOeval)
         s = coco_eval.stats
         iou_type = coco_eval.params.iouType
+        catIds = coco_eval.params.catIds
         res = self.results[iou_type]
         metrics = COCOResults.METRICS[iou_type]
-        for idx, metric in enumerate(metrics):
-            res[metric] = s[idx]
+
+        # if current eval is single catId, add to results
+        if len(catIds) is 1:
+            res[catIds[0]] = {}
+            for idx, metric in enumerate(metrics):
+                res[catIds[0]][metric] = s[idx]
+        else:
+            for idx, metric in enumerate(metrics):
+                res[metric] = s[idx]
 
     def __repr__(self):
         # TODO make it pretty
